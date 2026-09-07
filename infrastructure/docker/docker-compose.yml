@@ -1,0 +1,76 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: zenml
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - zenml-network
+
+  zenml:
+    image: zenmldocker/zenml-server
+    container_name: zenml_server
+    ports:
+      - "8080:8080"
+    environment:
+      ZENML_STORE_URL: mysql://root:password@mysql:3306/zenml
+      ZENML_DEFAULT_USER_NAME: admin
+      ZENML_DEFAULT_USER_PASSWORD: admin
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - zenml-network
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.15.1
+    container_name: mlflow_server
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --artifacts-destination
+      - /mlflow/artifacts
+      - --serve-artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --allowed-hosts
+      - "*"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:5000/health')
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - zenml-network
+
+volumes:
+  mysql_data:
+  mlflow_data:
+
+networks:
+  zenml-network:
+    driver: bridge   
