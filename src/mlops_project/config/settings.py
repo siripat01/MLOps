@@ -9,6 +9,10 @@ def _env(name: str, default: str) -> str:
     return os.getenv(name, default)
 
 
+def _optional_env(name: str) -> str | None:
+    return os.getenv(name) or None
+
+
 @dataclass(frozen=True)
 class DataPipelineSettings:
     dataset_name: str = field(default_factory=lambda: _env("DATASET_NAME", "store-sales"))
@@ -25,7 +29,7 @@ class DataPipelineSettings:
     feature_artifact_name: str = field(
         default_factory=lambda: _env("FEATURE_ARTIFACT_NAME", "store_sales_features")
     )
-    feature_version: str = field(default_factory=lambda: _env("FEATURE_VERSION", "v1"))
+    feature_version: str | None = field(default_factory=lambda: _optional_env("FEATURE_VERSION"))
     s3_endpoint_url: str = field(default_factory=lambda: _env("S3_ENDPOINT_URL", ""))
     s3_access_key: str = field(default_factory=lambda: _env("S3_ACCESS_KEY", ""))
     s3_secret_key: str = field(default_factory=lambda: _env("S3_SECRET_KEY", ""))
@@ -43,6 +47,8 @@ class DataPipelineSettings:
 
     @property
     def feature_uri(self) -> str | None:
+        if not self.feature_version:
+            return None
         return self._uri(
             self.feature_prefix, self.dataset_name, self.feature_version, "features.parquet"
         )

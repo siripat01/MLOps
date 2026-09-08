@@ -13,7 +13,7 @@ from mlops_project.data.schemas.features import validate_feature_table
 logger = get_logger(__name__)
 
 FEATURE_ARTIFACT_NAME = os.getenv("FEATURE_ARTIFACT_NAME", "store_sales_features")
-FEATURE_VERSION = os.getenv("FEATURE_VERSION", "v1")
+FEATURE_VERSION = os.getenv("FEATURE_VERSION") or None
 FEATURE_METADATA_ARTIFACT_NAME = f"{FEATURE_ARTIFACT_NAME}_metadata"
 
 
