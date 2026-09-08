@@ -63,8 +63,8 @@ The final feature artifact has a stable name:
 store_sales_features
 ```
 
-When `ZENML_FEATURE_VERSION` is left empty, ZenML automatically creates versions
-`1`, `2`, `3`, ... . You do not need the artifact UUID.
+ZenML automatically creates versions `1`, `2`, `3`, ... for that name. You do not
+need the artifact UUID.
 
 ```python
 from zenml.client import Client
