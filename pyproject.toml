@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 run-data-pipeline = "pipelines.data.main:main"
+run-training-pipeline = "pipelines.training.main:main"
 
 [project.optional-dependencies]
 dev = [

@@ -1,4 +1,4 @@
-.PHONY: install test lint format data-pipeline clean
+.PHONY: install test lint format data-pipeline train-pipeline clean
 
 install:
 	uv sync --extra dev
@@ -15,6 +15,9 @@ format:
 
 data-pipeline:
 	uv run run-data-pipeline
+
+train-pipeline:
+	uv run run-training-pipeline
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

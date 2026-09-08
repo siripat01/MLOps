@@ -112,5 +112,26 @@ s3://ml-data/features/store-sales/<feature-data-version>/features.parquet
 This separation avoids coupling the physical S3 path to ZenML's artifact-version
 control plane.
 
+## Training with Docker and GPU
+
+Start the local services before running a pipeline:
+
+```bash
+docker compose -f infrastructure/docker/docker-compose.yml up -d
+make data-pipeline
+make train-pipeline
+```
+
+The training entrypoint uses `http://172.17.0.1:8080` by default so Docker step
+containers can reach the ZenML server published on the host. Override it when
+the Docker bridge gateway differs:
+
+```bash
+ZENML_DOCKER_STORE_URL=http://<docker-host-gateway>:8080 make train-pipeline
+```
+
+Set `TRAIN_FEATURE_VERSION` to a numeric version such as `4`, or an alias such
+as `v4`. Leave it empty to use the latest feature artifact.
+
 Copy `.env.example` to `.env` for local-only configuration. Keep credentials out
 of version control.
