@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import pandera.polars as pa
 import polars as pl
+import pandera.polars as pa
 
 
 # Raw validation is intentionally structural. Value-level rules belong after cleaning
