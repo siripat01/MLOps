@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 
 def _env(name: str, default: str) -> str:
-    return os.getenv(name, default)
+    return os.getenv(name) or default
 
 
 def _optional_env(name: str) -> str | None:
@@ -29,7 +29,9 @@ class DataPipelineSettings:
     feature_artifact_name: str = field(
         default_factory=lambda: _env("FEATURE_ARTIFACT_NAME", "store_sales_features")
     )
-    feature_version: str | None = field(default_factory=lambda: _optional_env("FEATURE_VERSION"))
+    feature_data_version: str | None = field(
+        default_factory=lambda: _optional_env("FEATURE_DATA_VERSION")
+    )
     s3_endpoint_url: str = field(default_factory=lambda: _env("S3_ENDPOINT_URL", ""))
     s3_access_key: str = field(default_factory=lambda: _env("S3_ACCESS_KEY", ""))
     s3_secret_key: str = field(default_factory=lambda: _env("S3_SECRET_KEY", ""))
@@ -46,11 +48,16 @@ class DataPipelineSettings:
         return self._uri(self.raw_prefix, self.dataset_name, self.dataset_version)
 
     @property
+    def resolved_feature_data_version(self) -> str:
+        return self.feature_data_version or self.dataset_version
+
+    @property
     def feature_uri(self) -> str | None:
-        if not self.feature_version:
-            return None
         return self._uri(
-            self.feature_prefix, self.dataset_name, self.feature_version, "features.parquet"
+            self.feature_prefix,
+            self.dataset_name,
+            self.resolved_feature_data_version,
+            "features.parquet",
         )
 
     def intermediate_uri(self, stage: str) -> str | None:

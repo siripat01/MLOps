@@ -23,13 +23,19 @@ def engineer_features(df: pl.DataFrame) -> tuple[pl.DataFrame, dict[str, Any]]:
     metadata = {
         "dataset_name": settings.dataset_name,
         "dataset_version": settings.dataset_version,
-        "feature_version": settings.feature_version,
-        "schema_version": "features.v1",
+        "feature_data_version": settings.resolved_feature_data_version,
+        "zenml_artifact_name": settings.feature_artifact_name,
+        "schema_version": "features.v2",
         "generation_timestamp": datetime.now(UTC).isoformat(),
         "rows": features.height,
         "columns": features.width,
         "feature_names": feature_names(features),
         "uri": uri,
     }
-    logger.info("[features] rows=%s features=%s", features.height, len(metadata["feature_names"]))
+    logger.info(
+        "[features] rows=%s features=%s uri=%s",
+        features.height,
+        len(metadata["feature_names"]),
+        uri,
+    )
     return features, metadata

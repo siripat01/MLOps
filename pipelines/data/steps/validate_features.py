@@ -13,7 +13,12 @@ from mlops_project.data.schemas.features import validate_feature_table
 logger = get_logger(__name__)
 
 FEATURE_ARTIFACT_NAME = os.getenv("FEATURE_ARTIFACT_NAME", "store_sales_features")
-FEATURE_VERSION = os.getenv("FEATURE_VERSION") or None
+# Leave unset to let ZenML assign versions "1", "2", "3", ...
+ZENML_FEATURE_VERSION = (
+    os.getenv("ZENML_FEATURE_VERSION")
+    or os.getenv("FEATURE_VERSION")  # backwards compatibility
+    or None
+)
 FEATURE_METADATA_ARTIFACT_NAME = f"{FEATURE_ARTIFACT_NAME}_metadata"
 
 
@@ -25,7 +30,7 @@ def validate_features(
         pl.DataFrame,
         ArtifactConfig(
             name=FEATURE_ARTIFACT_NAME,
-            version=FEATURE_VERSION,
+            version=ZENML_FEATURE_VERSION,
             artifact_type=ArtifactType.DATA,
             tags=["features", "store-sales"],
         ),
@@ -34,7 +39,7 @@ def validate_features(
         dict[str, Any],
         ArtifactConfig(
             name=FEATURE_METADATA_ARTIFACT_NAME,
-            version=FEATURE_VERSION,
+            version=ZENML_FEATURE_VERSION,
             tags=["features", "metadata", "store-sales"],
         ),
     ],
@@ -50,6 +55,12 @@ def validate_features(
         **feature_metadata,
         "schema_valid": True,
         "high_missing_features": high_missing,
+        "zenml_version_policy": "custom" if ZENML_FEATURE_VERSION else "auto_increment",
     }
-    logger.info("[validate_features] schema_valid=true rows=%s", validated.height)
+    logger.info(
+        "[validate_features] schema_valid=true rows=%s artifact=%s version_policy=%s",
+        validated.height,
+        FEATURE_ARTIFACT_NAME,
+        metadata["zenml_version_policy"],
+    )
     return validated, metadata
