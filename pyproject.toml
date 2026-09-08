@@ -14,6 +14,8 @@ dependencies = [
   "openpyxl>=3.1,<4",
   "pandas>=2.0,<2.4",
   "pandera>=0.20,<0.27",
+  "polars>=1.0,<2",
+  "s3fs>2022.3.0,!=2025.3.1",
   "torch>=2.8,<2.11",
   "zenml[server]==0.96.4",
 ]
@@ -29,7 +31,8 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "."]
+include = ["mlops_project*", "pipelines*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
