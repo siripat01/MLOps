@@ -1,20 +1,44 @@
 from __future__ import annotations
 
-from typing import Any
+import os
+from typing import Annotated, Any
 
 import polars as pl
-from zenml import step
+from zenml import ArtifactConfig, step
+from zenml.enums import ArtifactType
 from zenml.logger import get_logger
 
 from mlops_project.data.schemas.features import validate_feature_table
 
 logger = get_logger(__name__)
 
+FEATURE_ARTIFACT_NAME = os.getenv("FEATURE_ARTIFACT_NAME", "store_sales_features")
+FEATURE_VERSION = os.getenv("FEATURE_VERSION", "v1")
+FEATURE_METADATA_ARTIFACT_NAME = f"{FEATURE_ARTIFACT_NAME}_metadata"
+
 
 @step
 def validate_features(
     features: pl.DataFrame, feature_metadata: dict[str, Any]
-) -> tuple[pl.DataFrame, dict[str, Any]]:
+) -> tuple[
+    Annotated[
+        pl.DataFrame,
+        ArtifactConfig(
+            name=FEATURE_ARTIFACT_NAME,
+            version=FEATURE_VERSION,
+            artifact_type=ArtifactType.DATA,
+            tags=["features", "store-sales"],
+        ),
+    ],
+    Annotated[
+        dict[str, Any],
+        ArtifactConfig(
+            name=FEATURE_METADATA_ARTIFACT_NAME,
+            version=FEATURE_VERSION,
+            tags=["features", "metadata", "store-sales"],
+        ),
+    ],
+]:
     validated = validate_feature_table(features)
     null_percentages = {
         col: validated.select(pl.col(col).is_null().mean()).item() for col in validated.columns
