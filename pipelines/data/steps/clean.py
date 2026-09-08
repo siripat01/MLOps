@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from typing import Any
+
+import polars as pl
+from zenml import step
+from zenml.logger import get_logger
+
+from mlops_project.config.settings import get_settings
+from mlops_project.data.cleaning import clean_raw_tables
+from mlops_project.storage.object_store import write_parquet_if_configured
+
+logger = get_logger(__name__)
+
+
+@step
+def clean_data(tables: dict[str, pl.DataFrame]) -> tuple[dict[str, pl.DataFrame], dict[str, Any]]:
+    settings = get_settings()
+    cleaned, metrics = clean_raw_tables(tables)
+    for name, df in cleaned.items():
+        uri = settings.intermediate_uri(f"clean/{name}")
+        write_parquet_if_configured(df, uri, settings)
+        metrics[name]["uri"] = uri
+        logger.info(
+            "[clean] table=%s rows_before=%s rows_after=%s",
+            name,
+            metrics[name]["rows_before"],
+            metrics[name]["rows_after"],
+        )
+    return cleaned, metrics

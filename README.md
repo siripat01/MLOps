@@ -23,7 +23,7 @@ deployment, and monitoring.
 
 ```bash
 uv sync --extra dev
-uv run prepare-data
+uv run run-data-pipeline
 uv run pytest
 ```
 
@@ -32,11 +32,35 @@ virtual environment, project dependencies, and lockfile.
 
 ## Dataset
 
-The raw UCI Online Retail files are stored under `data/raw/` and intentionally
-ignored by Git. Run `uv run prepare-data` to create
-`data/processed/daily_sales.csv`, a regular daily panel suitable for
-AutoGluon's `TimeSeriesPredictor`. See `data/README.md` for provenance and data
-preparation details.
+The active data source is Kaggle's Store Sales time-series competition. The
+data pipeline ingests the Kaggle CSV files, validates raw contracts, profiles
+the inputs, cleans and joins the tables, transforms them into a canonical
+store-family daily panel, engineers historical/date/business features, and
+validates the final feature dataset.
+
+ZenML stores step artifacts in the active stack artifact store. In the local
+stack this is MinIO (`minio_store`, `s3://zenml`). Optional explicit versioned
+Parquet writes can also be enabled with `S3_BUCKET` and related variables in
+`.env`.
+
+Run the feature pipeline:
+
+```bash
+uv run run-data-pipeline
+```
+
+Pipeline stages:
+
+```text
+ingest_data
+validate_raw_data
+profile_data
+clean_data
+integrate_data
+transform_data
+engineer_features
+validate_features
+```
 
 Copy `.env.example` to `.env` for local-only configuration. Keep credentials out
 of version control.
