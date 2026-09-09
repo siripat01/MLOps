@@ -103,6 +103,7 @@ services:
       - zenml-network
 
   forecast-api:
+    profiles: ["serving"]
     image: ${BENTO_RUNTIME_IMAGE:-mlops-project/store-sales-forecast:latest}
     container_name: store_sales_forecast
     command: ["serve"]
