@@ -3,8 +3,8 @@ services:
     image: mysql:8.0
     container_name: mysql_db
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: zenml
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-dev-mysql}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-zenml}
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
@@ -23,9 +23,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ZENML_STORE_URL: mysql://root:password@mysql:3306/zenml
-      ZENML_DEFAULT_USER_NAME: admin
-      ZENML_DEFAULT_USER_PASSWORD: admin
+      ZENML_STORE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-local-dev-mysql}@mysql:3306/${MYSQL_DATABASE:-zenml}
+      ZENML_DEFAULT_USER_NAME: ${ZENML_DEFAULT_USER_NAME:-admin}
+      ZENML_DEFAULT_USER_PASSWORD: ${ZENML_DEFAULT_USER_PASSWORD:-local-dev-zenml}
     depends_on:
       mysql:
         condition: service_healthy
@@ -70,8 +70,8 @@ services:
     container_name: minio_server
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-minio}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -91,9 +91,12 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-dev-minio}
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
       mc mb --ignore-existing local/mlflow;
       mc mb --ignore-existing local/zenml;
       mc mb --ignore-existing local/ml-data;
@@ -103,29 +106,20 @@ services:
       - zenml-network
 
   forecast-api:
-    build:
-      context: ../..
-      dockerfile: infrastructure/docker/forecast-api.Dockerfile
-    container_name: forecast_api
-    environment:
-      BENTO_RUNTIME_IMAGE: ${BENTO_RUNTIME_IMAGE:-mlops-project/store-sales-forecast:latest}
-      BENTO_CONTAINER_NAME: ${BENTO_CONTAINER_NAME:-store-sales-forecast-bento}
-      BENTO_CONTAINER_PORT: ${BENTO_CONTAINER_PORT:-3000}
-      BENTO_PUBLISHED_PORT: ${BENTO_PUBLISHED_PORT:-3001}
-      BENTO_PUBLISH_HOST: 0.0.0.0
-      BENTO_BACKEND_HOST: host.docker.internal
-      BENTO_HEALTH_PATH: ${BENTO_HEALTH_PATH:-/readyz}
-      BENTO_PULL_POLICY: ${BENTO_PULL_POLICY:-always}
-      BENTO_STARTUP_TIMEOUT_SECONDS: ${BENTO_STARTUP_TIMEOUT_SECONDS:-120}
-      BENTO_CLEANUP_ON_SHUTDOWN: "false"
+    profiles: ["serving"]
+    image: ${BENTO_RUNTIME_IMAGE:-mlops-project/store-sales-forecast:latest}
+    container_name: store_sales_forecast
     ports:
-      - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - zenml
+      - "${BENTO_PUBLISHED_PORT:-8000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:3000/readyz')
+      interval: 5s
+      timeout: 3s
+      retries: 20
     networks:
       - zenml-network
 
