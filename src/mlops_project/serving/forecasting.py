@@ -21,7 +21,7 @@ class StoreSalesForecaster:
         self._predictor = predictor
 
     @classmethod
-    def load(cls, model_path: Path) -> "StoreSalesForecaster":
+    def load(cls, model_path: Path) -> StoreSalesForecaster:
         predictor = TimeSeriesPredictor.load(str(model_path))
         return cls(predictor)
 
