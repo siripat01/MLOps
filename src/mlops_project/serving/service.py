@@ -29,7 +29,7 @@ class StoreSalesForecastService:
     model_ref = bentoml.models.BentoModel(BENTO_MODEL_ALIAS)
 
     def __init__(self) -> None:
-        model_path = Path(self.model_ref.path_of("."))
+        model_path = Path(self.model_ref.path_of("learner.pkl")).parent
         self._forecaster = StoreSalesForecaster.load(model_path)
 
     @bentoml.api(route="/forecast")
