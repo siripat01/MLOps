@@ -5,7 +5,12 @@ from pathlib import Path
 import bentoml
 
 from mlops_project.serving.forecasting import StoreSalesForecaster
-from mlops_project.serving.schemas import ForecastRequest, ForecastResponse
+from mlops_project.serving.schemas import (
+    ForecastRequest,
+    ForecastResponse,
+    HistoryPoint,
+    KnownCovariatePoint,
+)
 
 BENTO_MODEL_ALIAS = "store_sales_model"
 
@@ -33,5 +38,13 @@ class StoreSalesForecastService:
         self._forecaster = StoreSalesForecaster.load(model_path)
 
     @bentoml.api(route="/forecast")
-    def forecast(self, request: ForecastRequest) -> ForecastResponse:
+    def forecast(
+        self,
+        history: list[HistoryPoint],
+        known_covariates: list[KnownCovariatePoint],
+    ) -> ForecastResponse:
+        request = ForecastRequest(
+            history=history,
+            known_covariates=known_covariates,
+        )
         return self._forecaster.predict(request)
