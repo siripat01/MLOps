@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import bentoml
+import docker
+from docker.utils import parse_repository_tag
 from zenml import step
 
 from pipelines.deployment.models import BentoBuildMetadata, ImageBuildMetadata
-
-
-def _run(command: list[str]) -> None:
-    subprocess.run(command, check=True)
 
 
 def resolve_image_tag(image_tag_template: str, *, version: str, git_sha: str) -> str:
@@ -22,6 +19,25 @@ def resolve_image_tag(image_tag_template: str, *, version: str, git_sha: str) ->
         return image_tag_template
 
     return f"{image_tag_template}:{version}"
+
+
+def _push_image(image_tag: str) -> None:
+    repository, tag = parse_repository_tag(image_tag)
+    tag = tag or "latest"
+
+    client = docker.from_env()
+    try:
+        for event in client.images.push(
+            repository,
+            tag=tag,
+            stream=True,
+            decode=True,
+        ):
+            error = event.get("error")
+            if error:
+                raise RuntimeError(f"Docker image push failed: {error}")
+    finally:
+        client.close()
 
 
 @step(enable_cache=False)
@@ -60,6 +76,6 @@ def push_container_image(
     if not push:
         return image
 
-    _run(["docker", "push", image.image_tag])
+    _push_image(image.image_tag)
     registry = image.image_tag.split("/", maxsplit=1)[0] if "/" in image.image_tag else None
     return image.model_copy(update={"pushed": True, "registry": registry})
