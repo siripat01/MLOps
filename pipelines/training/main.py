@@ -71,13 +71,15 @@ orchestrator_settings = LocalDockerOrchestratorSettings(
 def training_pipeline(artifact_version: str | None = None, prediction_length: int = 16) -> None:
     dataset, _artifact_metadata = load_dataset(artifact_version=artifact_version)
     train_df, validate_df, _spliting_metadata = split_data(
-        df=dataset, dataset_metadata=_artifact_metadata, prediction_length=prediction_length
+        df=dataset,
+        dataset_metadata=_artifact_metadata,
+        prediction_length=prediction_length,
     )
 
     train_ts = prepare_training_data(train_df)
     validation_ts = prepare_training_data(validate_df)
 
-    model_path = train_model(train_ts)
+    model_path = train_model(train_ts, prediction_length=prediction_length)
 
     evaluate_model(
         model_path,
@@ -89,7 +91,7 @@ def training_pipeline(artifact_version: str | None = None, prediction_length: in
 def main() -> None:
     training_pipeline(
         artifact_version=os.getenv("TRAIN_FEATURE_VERSION") or None,
-        prediction_length=16,
+        prediction_length=int(os.getenv("PREDICTION_LENGTH", "16")),
     )
 
 
