@@ -135,3 +135,78 @@ as `v4`. Leave it empty to use the latest feature artifact.
 
 Copy `.env.example` to `.env` for local-only configuration. Keep credentials out
 of version control.
+
+## BentoML image build phase
+
+Register a local ZenML stack with the BentoML model deployer once:
+
+```bash
+make register-bentoml-stack
+```
+
+Build a BentoML image only after the quality gate passes. By default this
+pipeline trains a fresh model in the same run, then performs release packaging:
+
+```bash
+BENTO_IMAGE_TAG='mlops-project/store-sales-forecast:{version}' make deploy-build-pipeline
+```
+
+To release an already-versioned ZenML model artifact instead, set:
+
+```bash
+MODEL_ARTIFACT_NAME=<artifact-name> MODEL_ARTIFACT_VERSION=<version> make deploy-build-pipeline
+```
+
+The deployment pipeline trains and evaluates the model, checks metric thresholds
+(`QUALITY_GATE_MAX_RMSLE`, plus optional WQL/RMSE thresholds), validates that the
+AutoGluon predictor can be loaded, prepares an isolated Bento build context,
+builds a Bento with `bentoml build -o tag`, and containerizes it with
+`bentoml containerize`. Source-code checks belong in CI by default; set
+`QUALITY_GATE_RUN_PROJECT_CHECKS=true` only for local development. It does not
+start or deploy the API server yet.
+
+## FastAPI serving phase
+
+Serving is a separate process from the deployment pipeline. The deployment
+pipeline only evaluates the model, builds the BentoML OCI image, and optionally
+pushes it. The FastAPI server in `src/mlops_project/serving/server.py` owns the
+runtime lifecycle: on startup it pulls `BENTO_RUNTIME_IMAGE`, replaces the
+managed Bento container, waits for Bento's `/readyz`, and proxies inference
+requests.
+
+The generated Bento service still uses `@bentoml.service` and `@bentoml.api` for
+model inference. These decorators define the service inside the image; Docker
+is responsible for pulling and running that image.
+
+Docker credentials must be available to the Docker daemon pulling the image; a
+ZenML container-registry registration does not automatically authenticate the
+runtime Docker daemon.
+
+After the build pipeline prints the pushed image tag, set its exact value in
+`.env`:
+
+```bash
+BENTO_RUNTIME_IMAGE=registry.example.com/mlops/store-sales-forecast:gitsha-timestamp
+```
+
+Then start the BentoML API:
+
+```bash
+docker login registry.example.com
+docker compose -f infrastructure/docker/docker-compose.yml up -d forecast-api
+curl http://localhost:8000/healthz
+```
+
+The FastAPI server exposes `/forecast` and forwards to the BentoML inference
+endpoint:
+
+```bash
+curl -X POST http://localhost:8000/v1/forecast \
+  -H 'content-type: application/json' \
+  -d '{"history":[{"item_id":"1_1","date":"2017-01-01","target":10}]}'
+```
+
+Restarting `forecast-api` restarts only the serving process. Its startup hook
+pulls the configured image and starts the Bento container; the deployment
+pipeline is not restarted or invoked. For Kubernetes, keep the same separation
+but move image pull and container lifecycle management to a Deployment/Pod.

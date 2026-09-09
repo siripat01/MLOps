@@ -1,4 +1,4 @@
-.PHONY: install test lint format data-pipeline train-pipeline clean
+.PHONY: install test lint format quality-gate data-pipeline train-pipeline deploy-build-pipeline register-bentoml-stack serve-api clean
 
 install:
 	uv sync --extra dev
@@ -9,6 +9,8 @@ test:
 lint:
 	uv run ruff check .
 
+quality-gate: lint test
+
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
@@ -18,6 +20,15 @@ data-pipeline:
 
 train-pipeline:
 	uv run run-training-pipeline
+
+deploy-build-pipeline:
+	uv run run-deployment-pipeline
+
+register-bentoml-stack:
+	uv run bash scripts/register_zenml_bentoml_stack.sh
+
+serve-api:
+	uv run run-forecast-api
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

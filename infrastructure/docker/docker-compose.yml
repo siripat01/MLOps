@@ -102,6 +102,33 @@ services:
     networks:
       - zenml-network
 
+  forecast-api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/forecast-api.Dockerfile
+    container_name: forecast_api
+    environment:
+      BENTO_RUNTIME_IMAGE: ${BENTO_RUNTIME_IMAGE:-mlops-project/store-sales-forecast:latest}
+      BENTO_CONTAINER_NAME: ${BENTO_CONTAINER_NAME:-store-sales-forecast-bento}
+      BENTO_CONTAINER_PORT: ${BENTO_CONTAINER_PORT:-3000}
+      BENTO_PUBLISHED_PORT: ${BENTO_PUBLISHED_PORT:-3001}
+      BENTO_PUBLISH_HOST: 0.0.0.0
+      BENTO_BACKEND_HOST: host.docker.internal
+      BENTO_HEALTH_PATH: ${BENTO_HEALTH_PATH:-/readyz}
+      BENTO_PULL_POLICY: ${BENTO_PULL_POLICY:-always}
+      BENTO_STARTUP_TIMEOUT_SECONDS: ${BENTO_STARTUP_TIMEOUT_SECONDS:-120}
+      BENTO_CLEANUP_ON_SHUTDOWN: "false"
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - zenml
+    networks:
+      - zenml-network
+
 volumes:
   mysql_data:
   mlflow_data:

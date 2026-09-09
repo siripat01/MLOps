@@ -19,4 +19,8 @@ def evaluate_model(
         timestamp_column="date",
     )
 
-    return predictor.evaluate(validation_ts, display=True)
+    return predictor.evaluate(
+        validation_ts,
+        metrics=["WQL", "RMSE", "RMSLE"],
+        display=True,
+    )

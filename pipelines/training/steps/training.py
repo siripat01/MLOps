@@ -5,17 +5,9 @@ from pathlib import Path
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from zenml import step
-from zenml.config import ResourceSettings
 
 
 @step(
-    settings={
-        "resources": ResourceSettings(
-            cpu_count=20,
-            gpu_count=1,
-            memory="16GB",
-        )
-    },
     enable_cache=False,
 )
 def train_model(
@@ -36,9 +28,7 @@ def train_model(
 
     train_ts["is_holiday"] = train_ts["is_holiday"].fillna(False)
 
-    model_path = Path(
-        "artifacts/autogluon/store_sales"
-    ).resolve()
+    model_path = Path("artifacts/autogluon/store_sales").resolve()
 
     predictor = TimeSeriesPredictor(
         target="sales",
@@ -48,13 +38,24 @@ def train_model(
             "onpromotion",
             "is_holiday",
         ],
-        eval_metric="WQL",
+        eval_metric="RMSLE",
         path=str(model_path),
     )
 
     predictor.fit(
         train_ts,
-        presets="medium_quality",
+        presets="best_quality",
+        enable_ensemble=True,
+        verbosity=3,
     )
+
+    fitted_models = predictor.model_names()
+    if not fitted_models:
+        raise RuntimeError(
+            "DeepAR did not produce a fitted model. Check the training logs "
+            "for CUDA or data compatibility errors."
+        )
+
+    print(predictor.leaderboard())
 
     return model_path
