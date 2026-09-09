@@ -1,4 +1,4 @@
-.PHONY: install test lint format quality-gate data-pipeline train-pipeline deploy-build-pipeline register-bentoml-stack serve-api clean
+.PHONY: install test lint format quality-gate data-pipeline train-pipeline deploy-build-pipeline serve-api clean
 
 install:
 	uv sync --extra dev
@@ -23,9 +23,6 @@ train-pipeline:
 
 deploy-build-pipeline:
 	uv run run-deployment-pipeline
-
-register-bentoml-stack:
-	uv run bash scripts/register_zenml_bentoml_stack.sh
 
 serve-api:
 	docker compose -f infrastructure/docker/docker-compose.yml up forecast-api
