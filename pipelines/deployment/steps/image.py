@@ -37,16 +37,11 @@ def build_container_image(
         git_sha=bento_metadata.git_sha,
     )
 
-    _run(
-        [
-            "bentoml",
-            "containerize",
-            str(bento.tag),
-            "-t",
-            resolved_image_tag,
-            "--progress",
-            "plain",
-        ]
+    bentoml.container.build(
+        str(bento.tag),
+        backend="docker",
+        image_tag=(resolved_image_tag,),
+        progress="plain",
     )
 
     return ImageBuildMetadata(
