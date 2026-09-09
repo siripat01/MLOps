@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import bentoml
+from dotenv import load_dotenv
 
 from mlops_project.serving.forecasting import StoreSalesForecaster
 from mlops_project.serving.schemas import (
@@ -12,7 +14,10 @@ from mlops_project.serving.schemas import (
     KnownCovariatePoint,
 )
 
-BENTO_MODEL_ALIAS = "store_sales_model"
+load_dotenv()
+
+BENTO_NAME = os.getenv("BENTO_NAME", "store_sales_forecaster")
+BENTO_MODEL_ALIAS = os.getenv("BENTO_MODEL_ALIAS", "store_sales_model")
 
 service_image = (
     bentoml.images.Image(python_version="3.12")
@@ -26,8 +31,12 @@ service_image = (
 
 
 @bentoml.service(
-    name="store_sales_forecaster",
+    name=BENTO_NAME,
     image=service_image,
+    envs=[
+        {"name": "BENTO_NAME", "value": BENTO_NAME},
+        {"name": "BENTO_MODEL_ALIAS", "value": BENTO_MODEL_ALIAS},
+    ],
     traffic={"timeout": 120},
 )
 class StoreSalesForecastService:
