@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 import shutil
-import subprocess
 import time
 from pathlib import Path
 from typing import Annotated, Any
 
 import bentoml
+from dotenv import load_dotenv
 from zenml import ArtifactConfig, step
 from zenml.enums import ArtifactType
 
@@ -14,25 +15,32 @@ from pipelines.deployment.models import BentoBuildMetadata, ModelArtifactMetadat
 from pipelines.deployment.steps.model_validation import validate_autogluon_predictor
 from pipelines.deployment.steps.quality_gate import QualityGateResult
 
-BENTO_NAME = "store_sales_forecaster"
-BENTO_MODEL_NAME = "store_sales_forecaster_model"
-BENTO_MODEL_ALIAS = "store_sales_model"
-SERVICE_IMPORT = "mlops_project.serving.service:StoreSalesForecastService"
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-SOURCE_ROOT = PROJECT_ROOT / "src"
-BENTO_EXPORT_ROOT = Path("build/bentos")
+load_dotenv()
+
+_DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+BENTO_NAME = os.getenv("BENTO_NAME", "store_sales_forecaster")
+BENTO_MODEL_NAME = os.getenv("BENTO_MODEL_NAME", "store_sales_forecaster_model")
+BENTO_MODEL_ALIAS = os.getenv("BENTO_MODEL_ALIAS", "store_sales_model")
+SERVICE_IMPORT = os.getenv(
+    "SERVICE_IMPORT",
+    "mlops_project.serving.service:StoreSalesForecastService",
+)
+PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", str(_DEFAULT_PROJECT_ROOT))).resolve()
+SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "src"))
+if not SOURCE_ROOT.is_absolute():
+    SOURCE_ROOT = PROJECT_ROOT / SOURCE_ROOT
+BENTO_EXPORT_ROOT = Path(os.getenv("BENTO_EXPORT_ROOT", "build/bentos"))
+if not BENTO_EXPORT_ROOT.is_absolute():
+    BENTO_EXPORT_ROOT = PROJECT_ROOT / BENTO_EXPORT_ROOT
 
 
 def _git_sha() -> str:
-    result = subprocess.run(
-        ["git", "rev-parse", "--short=12", "HEAD"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
+    """Read the source revision injected by the release environment."""
+    git_sha = os.getenv("GIT_SHA") or os.getenv("GITHUB_SHA")
+    if not git_sha:
         return "nogit"
-    return result.stdout.strip()
+    return git_sha[:12]
 
 
 def make_build_version(git_sha: str, timestamp: int | None = None) -> str:
@@ -114,9 +122,8 @@ def build_bento(
         },
     )
 
-    export_root = BENTO_EXPORT_ROOT.resolve()
-    export_root.mkdir(parents=True, exist_ok=True)
-    export_path = export_root / f"{build_version}.bento"
+    BENTO_EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
+    export_path = BENTO_EXPORT_ROOT / f"{build_version}.bento"
     if export_path.exists():
         export_path.unlink()
 
