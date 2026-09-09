@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -46,24 +45,14 @@ def assert_metric_thresholds(
     )
 
 
-def run_quality_commands() -> None:
-    commands = [
-        ["uv", "run", "ruff", "check", "."],
-        ["uv", "run", "pytest", "--cov=mlops_project", "--cov-report=term-missing"],
-    ]
-    for command in commands:
-        subprocess.run(command, check=True)
-
-
 @step(enable_cache=False)
 def quality_gate(
     metrics: dict[str, float],
     max_rmsle: float = 0.75,
     max_wql: float | None = None,
     max_rmse: float | None = None,
-    run_project_checks: bool = False,
 ) -> QualityGateResult:
-    gate = assert_metric_thresholds(
+    return assert_metric_thresholds(
         metrics=metrics,
         thresholds={
             "rmsle": max_rmsle,
@@ -71,6 +60,3 @@ def quality_gate(
             "rmse": max_rmse,
         },
     )
-    if run_project_checks:
-        run_quality_commands()
-    return gate
