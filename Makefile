@@ -28,7 +28,7 @@ register-bentoml-stack:
 	uv run bash scripts/register_zenml_bentoml_stack.sh
 
 serve-api:
-	uv run run-forecast-api
+	docker compose -f infrastructure/docker/docker-compose.yml up forecast-api
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
