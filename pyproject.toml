@@ -33,7 +33,6 @@ dependencies = [
 run-data-pipeline = "pipelines.data.main:main"
 run-deployment-pipeline = "pipelines.deployment.main:main"
 run-training-pipeline = "pipelines.training.main:main"
-run-forecast-api = "mlops_project.serving.server:main"
 
 [project.optional-dependencies]
 dev = [
