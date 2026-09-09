@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import time
 from pathlib import Path
 from typing import Annotated, Any
@@ -37,15 +36,11 @@ if not BENTO_EXPORT_ROOT.is_absolute():
 
 
 def _git_sha() -> str:
-    result = subprocess.run(
-        ["git", "rev-parse", "--short=12", "HEAD"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
+    """Read the source revision injected by the release environment."""
+    git_sha = os.getenv("GIT_SHA") or os.getenv("GITHUB_SHA")
+    if not git_sha:
         return "nogit"
-    return result.stdout.strip()
+    return git_sha[:12]
 
 
 def make_build_version(git_sha: str, timestamp: int | None = None) -> str:
