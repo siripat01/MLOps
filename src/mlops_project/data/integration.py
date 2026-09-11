@@ -60,7 +60,12 @@ def scope_holidays_to_stores(
     )
 
 
-def integrate_store_sales(tables: dict[str, pl.DataFrame]) -> tuple[pl.DataFrame, dict[str, Any]]:
+def integrate_store_sales(
+    tables: dict[str, pl.DataFrame],
+    *,
+    max_oil_miss_rate: float = 0.20,
+    max_transaction_miss_rate: float = 0.20,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
     train = tables["train"]
     stores = tables["stores"].rename({"type": "store_type"})
     oil = tables["oil"]
@@ -91,9 +96,37 @@ def integrate_store_sales(tables: dict[str, pl.DataFrame]) -> tuple[pl.DataFrame
     metrics["unmatched_oil_dates"] = integrated.filter(pl.col("dcoilwtico").is_null()).height
     metrics["unmatched_transactions"] = integrated.filter(pl.col("transactions").is_null()).height
     metrics["holiday_rows"] = integrated.filter(pl.col("is_holiday")).height
+    metrics["store_join_miss_rate"] = (
+        metrics["unmatched_stores"] / train.height if train.height else 0.0
+    )
+    metrics["oil_join_miss_rate"] = (
+        metrics["unmatched_oil_dates"] / train.height if train.height else 0.0
+    )
+    metrics["transaction_join_miss_rate"] = (
+        metrics["unmatched_transactions"] / train.height if train.height else 0.0
+    )
+    metrics["row_multiplication_factor"] = integrated.height / train.height if train.height else 1.0
 
     if integrated.height != train.height:
         raise ValueError(
             f"Unexpected join row expansion: before={train.height}, after={integrated.height}"
+        )
+    if metrics["unmatched_stores"]:
+        raise ValueError(
+            "Store join produced unmatched rows: "
+            f"{metrics['unmatched_stores']} "
+            f"({metrics['store_join_miss_rate']:.2%})"
+        )
+    if metrics["oil_join_miss_rate"] > max_oil_miss_rate:
+        raise ValueError(
+            "Oil join miss rate exceeds threshold: "
+            f"threshold={max_oil_miss_rate:.2%}, "
+            f"observed={metrics['oil_join_miss_rate']:.2%}"
+        )
+    if metrics["transaction_join_miss_rate"] > max_transaction_miss_rate:
+        raise ValueError(
+            "Transaction join miss rate exceeds threshold: "
+            f"threshold={max_transaction_miss_rate:.2%}, "
+            f"observed={metrics['transaction_join_miss_rate']:.2%}"
         )
     return integrated, metrics

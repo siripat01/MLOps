@@ -3,6 +3,8 @@ from __future__ import annotations
 import pandera.polars as pa
 import polars as pl
 
+from mlops_project.data.quality import validate_series_calendar
+
 CLEANED_SCHEMAS = {
     "train": pa.DataFrameSchema(
         {
@@ -70,4 +72,10 @@ def validate_cleaned_tables(tables: dict[str, pl.DataFrame]) -> dict[str, pl.Dat
             "transactions must be unique on ['date', 'store_nbr']; "
             f"found {duplicated_transactions} duplicates"
         )
+    validate_series_calendar(
+        validated["train"],
+        table_name="Cleaned train",
+        min_history_per_series=1,
+        max_missing_calendar_dates=0,
+    )
     return validated

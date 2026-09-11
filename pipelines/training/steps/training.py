@@ -9,6 +9,8 @@ from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from zenml import ArtifactConfig, step
 from zenml.enums import ArtifactType
 
+from mlops_project.data.features import KNOWN_COVARIATE_COLUMNS
+
 MODEL_ARTIFACT_NAME = os.getenv("MODEL_ARTIFACT_NAME", "store_sales_model")
 
 
@@ -34,8 +36,12 @@ def train_model(
     train_ts = train_ts.convert_frequency(freq="D")
 
     # Fill known covariates generated for missing dates.
-    train_ts["onpromotion"] = train_ts["onpromotion"].fillna(0)
-    train_ts["is_holiday"] = train_ts["is_holiday"].fillna(False)
+    for column in KNOWN_COVARIATE_COLUMNS:
+        if column in train_ts.columns:
+            if pd.api.types.is_bool_dtype(train_ts[column]):
+                train_ts[column] = train_ts[column].fillna(False)
+            else:
+                train_ts[column] = train_ts[column].fillna(0)
 
     model_path = Path("artifacts/autogluon/store_sales").resolve()
 
@@ -43,10 +49,7 @@ def train_model(
         target="sales",
         prediction_length=prediction_length,
         freq="D",
-        known_covariates_names=[
-            "onpromotion",
-            "is_holiday",
-        ],
+        known_covariates_names=KNOWN_COVARIATE_COLUMNS,
         eval_metric="RMSLE",
         path=str(model_path),
     )
