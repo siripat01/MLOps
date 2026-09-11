@@ -29,8 +29,23 @@ def series_calendar_report(df: pl.DataFrame) -> dict[str, Any]:
             "min_observations_per_series": 0,
             "max_observations_per_series": 0,
             "missing_calendar_dates": 0,
+            "global_calendar_gap_dates": 0,
             "incomplete_series_count": 0,
         }
+
+    dataset_calendar = df.select("date").unique().sort("date")
+    dataset_start = dataset_calendar.select(pl.col("date").min()).item()
+    dataset_end = dataset_calendar.select(pl.col("date").max()).item()
+    calendar_days = (
+        pl.DataFrame({"date": pl.date_range(dataset_start, dataset_end, eager=True)})
+        if dataset_start is not None and dataset_end is not None
+        else pl.DataFrame({"date": []}, schema={"date": pl.Date})
+    )
+    global_calendar_gap_dates = calendar_days.join(
+        dataset_calendar,
+        on="date",
+        how="anti",
+    ).height
 
     coverage = (
         df.group_by(SERIES_KEYS)
@@ -39,11 +54,15 @@ def series_calendar_report(df: pl.DataFrame) -> dict[str, Any]:
             pl.col("date").max().alias("end_date"),
             pl.col("date").n_unique().alias("observations"),
         )
-        .with_columns(
-            (
-                (pl.col("end_date") - pl.col("start_date")).dt.total_days() + 1
-            ).alias("expected_observations")
+        .join_where(
+            dataset_calendar.rename({"date": "_calendar_date"}),
+            pl.col("_calendar_date").is_between(
+                pl.col("start_date"),
+                pl.col("end_date"),
+            ),
         )
+        .group_by([*SERIES_KEYS, "start_date", "end_date", "observations"])
+        .agg(pl.col("_calendar_date").n_unique().alias("expected_observations"))
         .with_columns(
             (pl.col("expected_observations") - pl.col("observations")).alias(
                 "missing_dates"
@@ -62,6 +81,7 @@ def series_calendar_report(df: pl.DataFrame) -> dict[str, Any]:
             pl.col("observations").max()
         ).item(),
         "missing_calendar_dates": coverage.select(pl.col("missing_dates").sum()).item(),
+        "global_calendar_gap_dates": global_calendar_gap_dates,
         "incomplete_series_count": coverage.filter(pl.col("missing_dates") > 0).height,
     }
 

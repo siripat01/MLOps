@@ -10,7 +10,7 @@ from mlops_project.data.features import (
     engineer_store_sales_features,
 )
 from mlops_project.data.integration import integrate_store_sales, scope_holidays_to_stores
-from mlops_project.data.quality import validate_cleaning_row_loss
+from mlops_project.data.quality import validate_cleaning_row_loss, validate_series_calendar
 from mlops_project.data.schemas.cleaned import validate_cleaned_tables
 from mlops_project.data.schemas.features import validate_feature_table
 from mlops_project.data.schemas.raw import validate_raw_tables
@@ -104,10 +104,33 @@ def test_join_rejects_duplicate_store_dimension_keys() -> None:
 
 def test_cleaned_validation_rejects_missing_dates_per_series() -> None:
     tables = raw_tables()
+    second_series = tables["train"].with_columns(
+        (pl.col("id") + 10).alias("id"),
+        pl.lit(2).cast(pl.Int64).alias("store_nbr"),
+    )
+    tables["train"] = pl.concat([tables["train"], second_series])
     tables["train"] = tables["train"].filter(pl.col("date") != pl.date(2024, 1, 2))
+    tables["train"] = pl.concat(
+        [
+            tables["train"],
+            second_series.filter(pl.col("date") == pl.date(2024, 1, 2)),
+        ]
+    )
     cleaned, _ = clean_raw_tables(tables)
     with pytest.raises(ValueError, match="missing calendar dates"):
         validate_cleaned_tables(cleaned)
+
+
+def test_series_calendar_allows_dates_missing_from_all_series() -> None:
+    tables = raw_tables()
+    tables["train"] = tables["train"].filter(pl.col("date") != pl.date(2024, 1, 2))
+    cleaned, _ = clean_raw_tables(tables)
+
+    validate_cleaned_tables(cleaned)
+    report = validate_series_calendar(cleaned["train"], table_name="Cleaned train")
+
+    assert report["missing_calendar_dates"] == 0
+    assert report["global_calendar_gap_dates"] == 1
 
 
 def test_cleaned_validation_rejects_duplicate_store_family_date_keys() -> None:
