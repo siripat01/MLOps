@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
+from mlops_project.features.covariates import records_to_known_covariates, to_timeseries_frame
 from mlops_project.serving.schemas import (
     ForecastPoint,
     ForecastRequest,
@@ -37,31 +38,13 @@ class StoreSalesForecaster:
 
     @staticmethod
     def _history_frame(points: list[HistoryPoint]) -> TimeSeriesDataFrame:
-        frame = pd.DataFrame(point.model_dump() for point in points)
-        timeseries = TimeSeriesDataFrame.from_data_frame(
-            frame,
-            id_column="item_id",
-            timestamp_column="date",
-        ).convert_frequency(freq="D")
-
-        timeseries["onpromotion"] = timeseries["onpromotion"].fillna(0)
-        timeseries["is_holiday"] = timeseries["is_holiday"].fillna(False)
-        return timeseries
+        return to_timeseries_frame(pd.DataFrame(point.model_dump() for point in points))
 
     @staticmethod
     def _known_covariates_frame(
         points: list[KnownCovariatePoint],
     ) -> TimeSeriesDataFrame:
-        frame = pd.DataFrame(point.model_dump() for point in points)
-        timeseries = TimeSeriesDataFrame.from_data_frame(
-            frame,
-            id_column="item_id",
-            timestamp_column="date",
-        ).convert_frequency(freq="D")
-
-        timeseries["onpromotion"] = timeseries["onpromotion"].fillna(0)
-        timeseries["is_holiday"] = timeseries["is_holiday"].fillna(False)
-        return timeseries
+        return records_to_known_covariates([point.model_dump() for point in points])
 
     @staticmethod
     def _serialize(predictions: TimeSeriesDataFrame) -> list[ForecastPoint]:

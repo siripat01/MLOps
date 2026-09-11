@@ -2,71 +2,78 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
+import mlflow
 import pandas as pd
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
-from zenml import ArtifactConfig, step
+from zenml import ArtifactConfig, log_metadata, step
 from zenml.enums import ArtifactType
 
-from mlops_project.data.features import KNOWN_COVARIATE_COLUMNS
+from mlops_project.models.training import train_store_sales_predictor
 
 MODEL_ARTIFACT_NAME = os.getenv("MODEL_ARTIFACT_NAME", "store_sales_model")
+EXPERIMENT_TRACKER_NAME = os.getenv("ZENML_EXPERIMENT_TRACKER_NAME") or os.getenv(
+    "MLFLOW_EXPERIMENT_TRACKER_NAME"
+)
 
 
-@step(enable_cache=False)
+def _log_mlflow_training(metadata: dict[str, Any]) -> None:
+    if mlflow.active_run() is None:
+        return
+    mlflow.log_params(
+        {
+            "prediction_length": metadata["prediction_length"],
+            "presets": metadata["presets"],
+            "eval_metric": metadata["eval_metric"],
+            "time_limit": metadata["time_limit"],
+            "enable_ensemble": metadata["enable_ensemble"],
+            "known_covariate_count": len(metadata["known_covariates"]),
+        }
+    )
+    mlflow.log_metric("train_rows", metadata["train_rows"])
+    mlflow.log_metric("train_items", metadata["train_items"])
+    mlflow.log_metric("model_count", metadata["model_count"])
+
+
+@step(enable_cache=False, experiment_tracker=EXPERIMENT_TRACKER_NAME)
 def train_model(
     train_data: pd.DataFrame,
     prediction_length: int = 16,
-) -> Annotated[
-    Path,
-    ArtifactConfig(
-        name=MODEL_ARTIFACT_NAME,
-        artifact_type=ArtifactType.MODEL,
-        tags=["autogluon", "store-sales"],
-    ),
+    presets: str = "best_quality",
+    eval_metric: str = "RMSLE",
+    time_limit: int | None = None,
+    enable_ensemble: bool = True,
+) -> tuple[
+    Annotated[
+        Path,
+        ArtifactConfig(
+            name=MODEL_ARTIFACT_NAME,
+            artifact_type=ArtifactType.MODEL,
+            tags=["autogluon", "store-sales"],
+        ),
+    ],
+    Annotated[
+        dict[str, Any],
+        ArtifactConfig(
+            name=f"{MODEL_ARTIFACT_NAME}_training_metadata",
+            tags=["autogluon", "training-metadata", "store-sales"],
+        ),
+    ],
 ]:
-    train_ts = TimeSeriesDataFrame.from_data_frame(
+    model_path, metadata = train_store_sales_predictor(
         train_data,
-        id_column="item_id",
-        timestamp_column="date",
-    )
-
-    # Store Sales is a daily forecasting problem.
-    train_ts = train_ts.convert_frequency(freq="D")
-
-    # Fill known covariates generated for missing dates.
-    for column in KNOWN_COVARIATE_COLUMNS:
-        if column in train_ts.columns:
-            if pd.api.types.is_bool_dtype(train_ts[column]):
-                train_ts[column] = train_ts[column].fillna(False)
-            else:
-                train_ts[column] = train_ts[column].fillna(0)
-
-    model_path = Path("artifacts/autogluon/store_sales").resolve()
-
-    predictor = TimeSeriesPredictor(
-        target="sales",
         prediction_length=prediction_length,
-        freq="D",
-        known_covariates_names=KNOWN_COVARIATE_COLUMNS,
-        eval_metric="RMSLE",
-        path=str(model_path),
+        presets=presets,
+        eval_metric=eval_metric,
+        time_limit=time_limit,
+        enable_ensemble=enable_ensemble,
     )
-
-    predictor.fit(
-        train_ts,
-        presets="best_quality",
-        enable_ensemble=True,
-        verbosity=3,
+    _log_mlflow_training(metadata)
+    log_metadata(
+        metadata={
+            "training": {
+                key: value for key, value in metadata.items() if key != "leaderboard"
+            }
+        }
     )
-
-    fitted_models = predictor.model_names()
-    if not fitted_models:
-        raise RuntimeError(
-            "Training did not produce a fitted model. Check the logs for CUDA "
-            "or data compatibility errors."
-        )
-
-    print(predictor.leaderboard())
-    return model_path
+    return model_path, metadata

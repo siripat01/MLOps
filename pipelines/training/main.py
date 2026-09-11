@@ -33,8 +33,10 @@ docker = DockerSettings(
     requirements=[
         "zenml==0.96.4",
         "autogluon.timeseries==1.6.1",
+        "mlflow>=2.1.1,<4",
         "torch==2.13.0",
         "torchvision==0.28.0",
+        "numpy",
         "pandas",
         "polars",
         "pyarrow",
@@ -46,6 +48,7 @@ docker = DockerSettings(
     environment={
         "PYTHONPATH": "/app/code/src:/app/code",
         "MPLCONFIGDIR": "/tmp/matplotlib",
+        "MLFLOW_TRACKING_URI": os.getenv("MLFLOW_DOCKER_TRACKING_URI", "http://172.17.0.1:5000"),
     },
 )
 
@@ -68,7 +71,14 @@ orchestrator_settings = LocalDockerOrchestratorSettings(
         "orchestrator.local_docker": orchestrator_settings,
     }
 )
-def training_pipeline(artifact_version: str | None = None, prediction_length: int = 16) -> None:
+def training_pipeline(
+    artifact_version: str | None = None,
+    prediction_length: int = 16,
+    presets: str = "best_quality",
+    eval_metric: str = "RMSLE",
+    time_limit: int | None = None,
+    enable_ensemble: bool = True,
+) -> None:
     dataset, _artifact_metadata = load_dataset(artifact_version=artifact_version)
     train_df, validate_df, _spliting_metadata = split_data(
         df=dataset,
@@ -79,12 +89,20 @@ def training_pipeline(artifact_version: str | None = None, prediction_length: in
     train_ts = prepare_training_data(train_df)
     validation_ts = prepare_training_data(validate_df)
 
-    model_path = train_model(train_ts, prediction_length=prediction_length)
+    model_path, training_metadata = train_model(
+        train_ts,
+        prediction_length=prediction_length,
+        presets=presets,
+        eval_metric=eval_metric,
+        time_limit=time_limit,
+        enable_ensemble=enable_ensemble,
+    )
 
     evaluate_model(
         model_path,
         train_ts,
         validation_ts,
+        training_metadata,
     )
 
 
@@ -92,6 +110,15 @@ def main() -> None:
     training_pipeline(
         artifact_version=os.getenv("TRAIN_FEATURE_VERSION") or None,
         prediction_length=int(os.getenv("PREDICTION_LENGTH", "16")),
+        presets=os.getenv("AUTOGLUON_PRESETS", "best_quality"),
+        eval_metric=os.getenv("AUTOGLUON_EVAL_METRIC", "RMSLE"),
+        time_limit=(
+            int(os.environ["AUTOGLUON_TIME_LIMIT"])
+            if os.getenv("AUTOGLUON_TIME_LIMIT")
+            else None
+        ),
+        enable_ensemble=os.getenv("AUTOGLUON_ENABLE_ENSEMBLE", "true").lower()
+        not in {"0", "false", "no"},
     )
 
 

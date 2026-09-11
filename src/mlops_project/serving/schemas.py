@@ -13,6 +13,8 @@ class HistoryPoint(BaseModel):
     sales: float
     onpromotion: float = 0
     is_holiday: bool = False
+    holiday_count: int | None = None
+    holiday_type: str | None = None
 
 
 class KnownCovariatePoint(BaseModel):
@@ -22,6 +24,8 @@ class KnownCovariatePoint(BaseModel):
     date: date
     onpromotion: float = 0
     is_holiday: bool = False
+    holiday_count: int | None = None
+    holiday_type: str | None = None
 
 
 class ForecastRequest(BaseModel):
