@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Tuple  # noqa: UP035
 
 import mlflow
 import pandas as pd
@@ -43,7 +43,7 @@ def train_model(
     eval_metric: str = "RMSLE",
     time_limit: int | None = None,
     enable_ensemble: bool = True,
-) -> tuple[
+) -> Tuple[  # noqa: UP006
     Annotated[
         Path,
         ArtifactConfig(

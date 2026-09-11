@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Tuple  # noqa: UP035
 
 import polars as pl
 from zenml import step
@@ -13,7 +13,7 @@ def split_data(
     dataset_metadata: dict[str, Any],
     prediction_length: int = 16,
     min_train_observations: int = 60,
-) -> tuple[
+) -> Tuple[  # noqa: UP006
     Annotated[pl.DataFrame, "train_df"],
     Annotated[pl.DataFrame, "validation_df"],
     Annotated[dict[str, Any], "split_metadata"],

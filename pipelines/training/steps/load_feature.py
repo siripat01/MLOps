@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Tuple  # noqa: UP035
 
 import polars as pl
 from zenml import step
@@ -40,7 +40,7 @@ def resolve_feature_dataset(
 @step(enable_cache=False)
 def load_dataset(
     artifact_version: str | None = None,
-) -> tuple[
+) -> Tuple[  # noqa: UP006
     Annotated[pl.DataFrame, "feature_dataset"],
     Annotated[dict[str, Any], "feature_dataset_metadata"],
 ]:
