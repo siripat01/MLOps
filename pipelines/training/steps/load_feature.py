@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -38,7 +38,12 @@ def resolve_feature_dataset(
 
 
 @step(enable_cache=False)
-def load_dataset(artifact_version: str | None = None) -> tuple[pl.DataFrame, dict[str, Any]]:
+def load_dataset(
+    artifact_version: str | None = None,
+) -> tuple[
+    Annotated[pl.DataFrame, "feature_dataset"],
+    Annotated[dict[str, Any], "feature_dataset_metadata"],
+]:
     """Load feature data from ZenML, or direct URI when metadata is unavailable."""
 
     return resolve_feature_dataset(artifact_version=artifact_version)

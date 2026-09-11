@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -14,9 +14,9 @@ def split_data(
     prediction_length: int = 16,
     min_train_observations: int = 60,
 ) -> tuple[
-    pl.DataFrame,
-    pl.DataFrame,
-    dict[str, Any],
+    Annotated[pl.DataFrame, "train_df"],
+    Annotated[pl.DataFrame, "validation_df"],
+    Annotated[dict[str, Any], "split_metadata"],
 ]:
     """Split a time-series dataset into train and validation sets.
 

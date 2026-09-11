@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -14,7 +14,10 @@ logger = get_logger(__name__)
 
 
 @step
-def transform_data(df: pl.DataFrame) -> tuple[pl.DataFrame, dict[str, Any]]:
+def transform_data(df: pl.DataFrame) -> tuple[
+    Annotated[pl.DataFrame, "transformed_data"],
+    Annotated[dict[str, Any], "transform_metadata"],
+]:
     settings = get_settings()
     transformed = transform_store_sales(df)
     uri = settings.intermediate_uri("transformed")

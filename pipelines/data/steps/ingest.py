@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -33,7 +33,10 @@ def load_store_sales_from_kaggle(competition: str) -> dict[str, pl.DataFrame]:
 
 
 @step(enable_cache=False)
-def ingest_data() -> tuple[dict[str, pl.DataFrame], dict[str, Any]]:
+def ingest_data() -> tuple[
+    Annotated[dict[str, pl.DataFrame], "raw_tables"],
+    Annotated[dict[str, Any], "ingestion_metadata"],
+]:
     settings = get_settings()
     tables = load_store_sales_from_kaggle(settings.kaggle_competition)
     metadata: dict[str, Any] = {

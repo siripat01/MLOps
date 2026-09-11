@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import log_metadata, step
@@ -14,7 +14,10 @@ logger = get_logger(__name__)
 
 
 @step
-def integrate_data(tables: dict[str, pl.DataFrame]) -> tuple[pl.DataFrame, dict[str, Any]]:
+def integrate_data(tables: dict[str, pl.DataFrame]) -> tuple[
+    Annotated[pl.DataFrame, "integrated_data"],
+    Annotated[dict[str, Any], "integration_metadata"],
+]:
     settings = get_settings()
     integrated, metrics = integrate_store_sales(tables)
     uri = settings.intermediate_uri("integrated")

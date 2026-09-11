@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -20,7 +20,10 @@ logger = get_logger(__name__)
 
 
 @step
-def engineer_features(df: pl.DataFrame) -> tuple[pl.DataFrame, dict[str, Any]]:
+def engineer_features(df: pl.DataFrame) -> tuple[
+    Annotated[pl.DataFrame, "engineered_features"],
+    Annotated[dict[str, Any], "feature_engineering_metadata"],
+]:
     settings = get_settings()
     features = engineer_store_sales_features(df)
     uri = settings.feature_uri

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -15,7 +15,10 @@ logger = get_logger(__name__)
 
 
 @step
-def clean_data(tables: dict[str, pl.DataFrame]) -> tuple[dict[str, pl.DataFrame], dict[str, Any]]:
+def clean_data(tables: dict[str, pl.DataFrame]) -> tuple[
+    Annotated[dict[str, pl.DataFrame], "cleaned_tables"],
+    Annotated[dict[str, Any], "cleaning_metadata"],
+]:
     settings = get_settings()
     cleaned, metrics = clean_raw_tables(tables)
     quality_report = validate_cleaning_row_loss(metrics)

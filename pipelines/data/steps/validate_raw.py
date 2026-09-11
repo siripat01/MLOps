@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import polars as pl
 from zenml import step
@@ -15,7 +15,10 @@ logger = get_logger(__name__)
 def validate_raw_data(
     tables: dict[str, pl.DataFrame],
     ingestion_metadata: dict[str, Any],
-) -> tuple[dict[str, pl.DataFrame], dict[str, Any]]:
+) -> tuple[
+    Annotated[dict[str, pl.DataFrame], "validated_raw_tables"],
+    Annotated[dict[str, Any], "raw_validation_metadata"],
+]:
     validated = validate_raw_tables(tables)
     metadata = {
         "schema_valid": True,
