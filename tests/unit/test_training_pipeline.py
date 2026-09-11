@@ -8,6 +8,7 @@ from mlops_project.data.features import KNOWN_COVARIATE_COLUMNS
 from mlops_project.features.covariates import training_frame_from_features
 from mlops_project.models import eval as model_eval
 from mlops_project.models import training as model_training
+from pipelines.training.steps import load_feature
 
 
 def training_rows() -> pd.DataFrame:
@@ -38,6 +39,41 @@ def test_direct_feature_uri_loader_reads_parquet(tmp_path) -> None:
 
     assert loaded.shape == (3, 5)
     assert loaded["item_id"].to_list() == ["1_AUTOMOTIVE"] * 3
+
+
+def test_feature_resolution_falls_back_to_direct_uri(monkeypatch) -> None:
+    expected = pl.DataFrame(training_rows())
+
+    def raise_missing_artifact(version: str | None = None) -> None:
+        raise KeyError("No artifact_versions found")
+
+    monkeypatch.setattr(load_feature, "get_feature_artifact", raise_missing_artifact)
+    monkeypatch.setattr(load_feature, "feature_uri_from_environment", lambda: "s3://features")
+    monkeypatch.setattr(
+        load_feature,
+        "load_feature_dataset_from_uri",
+        lambda uri: expected,
+    )
+
+    loaded, metadata = load_feature.resolve_feature_dataset(artifact_version="5")
+
+    assert loaded.equals(expected)
+    assert metadata["source"] == "direct_uri"
+    assert metadata["feature_uri"] == "s3://features"
+    assert metadata["requested_artifact_version"] == "5"
+
+
+def test_training_docker_feature_uri_uses_dataset_version(monkeypatch) -> None:
+    monkeypatch.setenv("DATASET_VERSION", "local-dev")
+    monkeypatch.delenv("FEATURE_DATA_VERSION", raising=False)
+    monkeypatch.delenv("TRAIN_FEATURE_URI", raising=False)
+
+    from pipelines.training import main as training_main
+
+    assert (
+        training_main._docker_feature_uri()
+        == "s3://zenml/features/store-sales/local-dev/features.parquet"
+    )
 
 
 def test_train_store_sales_predictor_returns_metadata(monkeypatch) -> None:

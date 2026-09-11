@@ -24,6 +24,25 @@ os.environ.setdefault(
     os.getenv("ZENML_DOCKER_STORE_URL", "http://172.17.0.1:8080"),
 )
 
+
+def _docker_feature_uri() -> str:
+    feature_version = (
+        os.getenv("FEATURE_DATA_VERSION")
+        or os.getenv("DATASET_VERSION")
+        or "local-dev"
+    )
+    return os.getenv("TRAIN_FEATURE_URI") or (
+        f"s3://{os.getenv('S3_BUCKET', 'zenml')}/"
+        f"{os.getenv('FEATURE_PREFIX', 'features')}/"
+        f"{os.getenv('DATASET_NAME', 'store-sales')}/"
+        f"{feature_version}/features.parquet"
+    )
+
+
+def _docker_endpoint(env_name: str, default: str) -> str:
+    value = os.getenv(env_name) or default
+    return value.replace("localhost", "172.17.0.1")
+
 docker = DockerSettings(
     parent_image="pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
     python_package_installer="uv",
@@ -48,7 +67,16 @@ docker = DockerSettings(
     environment={
         "PYTHONPATH": "/app/code/src:/app/code",
         "MPLCONFIGDIR": "/tmp/matplotlib",
-        "MLFLOW_TRACKING_URI": os.getenv("MLFLOW_DOCKER_TRACKING_URI", "http://172.17.0.1:5000"),
+        "TRAIN_FEATURE_URI": _docker_feature_uri(),
+        "S3_ENDPOINT_URL": _docker_endpoint("S3_ENDPOINT_URL", "http://172.17.0.1:9000"),
+        "S3_ACCESS_KEY": os.getenv("S3_ACCESS_KEY", "minioadmin"),
+        "S3_SECRET_KEY": os.getenv("S3_SECRET_KEY", "local-dev-minio"),
+        "S3_BUCKET": os.getenv("S3_BUCKET", "zenml"),
+        "S3_REGION": os.getenv("S3_REGION", "us-east-1"),
+        "MLFLOW_TRACKING_URI": _docker_endpoint(
+            "MLFLOW_DOCKER_TRACKING_URI",
+            "http://172.17.0.1:5000",
+        ),
     },
 )
 

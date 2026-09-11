@@ -12,10 +12,9 @@ from mlops_project.data.artifacts import (
 )
 
 
-@step(enable_cache=False)
-def load_dataset(artifact_version: str | None = None) -> tuple[pl.DataFrame, dict[str, Any]]:
-    """Load the feature dataset from ZenML by human-readable artifact version."""
-
+def resolve_feature_dataset(
+    artifact_version: str | None = None,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
     try:
         artifact = get_feature_artifact(version=artifact_version)
     except Exception as exc:
@@ -36,3 +35,10 @@ def load_dataset(artifact_version: str | None = None) -> tuple[pl.DataFrame, dic
         "artifact_version": artifact.version,
     }
     return artifact.load(), metadata
+
+
+@step(enable_cache=False)
+def load_dataset(artifact_version: str | None = None) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Load feature data from ZenML, or direct URI when metadata is unavailable."""
+
+    return resolve_feature_dataset(artifact_version=artifact_version)
