@@ -77,10 +77,21 @@ def integrate_store_sales(
     assert_unique(transactions, ["date", "store_nbr"], "transactions")
     assert_unique(holidays, ["date", "store_nbr"], "holidays")
 
+    oil_for_train_dates = (
+        train.select("date")
+        .unique()
+        .sort("date")
+        .join(oil, on="date", how="left")
+        .with_columns(
+            pl.col("dcoilwtico").is_null().alias("_oil_exact_date_missing"),
+            pl.col("dcoilwtico").fill_null(strategy="forward"),
+        )
+    )
+
     metrics: dict[str, Any] = {"rows_before": train.height}
     integrated = (
         train.join(stores, on="store_nbr", how="left")
-        .join(oil, on="date", how="left")
+        .join(oil_for_train_dates, on="date", how="left")
         .join(transactions, on=["date", "store_nbr"], how="left")
         .join(holidays, on=["date", "store_nbr"], how="left")
         .with_columns(
@@ -93,11 +104,17 @@ def integrate_store_sales(
 
     metrics["rows_after"] = integrated.height
     metrics["unmatched_stores"] = integrated.filter(pl.col("city").is_null()).height
+    metrics["raw_unmatched_oil_dates"] = integrated.filter(
+        pl.col("_oil_exact_date_missing")
+    ).height
     metrics["unmatched_oil_dates"] = integrated.filter(pl.col("dcoilwtico").is_null()).height
     metrics["unmatched_transactions"] = integrated.filter(pl.col("transactions").is_null()).height
     metrics["holiday_rows"] = integrated.filter(pl.col("is_holiday")).height
     metrics["store_join_miss_rate"] = (
         metrics["unmatched_stores"] / train.height if train.height else 0.0
+    )
+    metrics["raw_oil_join_miss_rate"] = (
+        metrics["raw_unmatched_oil_dates"] / train.height if train.height else 0.0
     )
     metrics["oil_join_miss_rate"] = (
         metrics["unmatched_oil_dates"] / train.height if train.height else 0.0
@@ -106,6 +123,7 @@ def integrate_store_sales(
         metrics["unmatched_transactions"] / train.height if train.height else 0.0
     )
     metrics["row_multiplication_factor"] = integrated.height / train.height if train.height else 1.0
+    integrated = integrated.drop("_oil_exact_date_missing")
 
     if integrated.height != train.height:
         raise ValueError(

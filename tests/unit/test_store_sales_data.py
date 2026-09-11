@@ -170,6 +170,33 @@ def test_join_rejects_store_and_transaction_miss_thresholds() -> None:
         )
 
 
+def test_oil_exact_date_misses_are_forward_filled_before_threshold() -> None:
+    cleaned, _ = clean_raw_tables(raw_tables())
+    cleaned["oil"] = cleaned["oil"].filter(pl.col("date") != pl.date(2024, 1, 2))
+    validated = validate_cleaned_tables(cleaned)
+
+    integrated, metrics = integrate_store_sales(
+        validated,
+        max_oil_miss_rate=0.0,
+    )
+
+    assert metrics["raw_oil_join_miss_rate"] == pytest.approx(1 / 3)
+    assert metrics["oil_join_miss_rate"] == 0.0
+    assert integrated["dcoilwtico"].to_list() == [80.0, 80.0, 82.0]
+
+
+def test_oil_gate_rejects_unfilled_leading_oil_misses() -> None:
+    cleaned, _ = clean_raw_tables(raw_tables())
+    cleaned["oil"] = cleaned["oil"].filter(pl.col("date") != pl.date(2024, 1, 1))
+    validated = validate_cleaned_tables(cleaned)
+
+    with pytest.raises(ValueError, match="Oil join miss rate exceeds threshold"):
+        integrate_store_sales(
+            validated,
+            max_oil_miss_rate=0.25,
+        )
+
+
 def test_local_holiday_only_applies_to_matching_city() -> None:
     stores = pl.DataFrame(
         {

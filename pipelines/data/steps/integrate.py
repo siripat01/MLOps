@@ -25,6 +25,7 @@ def integrate_data(tables: dict[str, pl.DataFrame]) -> tuple[pl.DataFrame, dict[
             "rows_before": metrics["rows_before"],
             "rows_after": metrics["rows_after"],
             "store_join_miss_rate": metrics["store_join_miss_rate"],
+            "raw_oil_join_miss_rate": metrics["raw_oil_join_miss_rate"],
             "oil_join_miss_rate": metrics["oil_join_miss_rate"],
             "transaction_join_miss_rate": metrics["transaction_join_miss_rate"],
             "row_multiplication_factor": metrics["row_multiplication_factor"],
