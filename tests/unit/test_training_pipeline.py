@@ -105,6 +105,14 @@ def test_train_store_sales_predictor_returns_metadata(monkeypatch) -> None:
     assert metadata["best_model"] == "WeightedEnsemble"
     assert metadata["known_covariates"] == KNOWN_COVARIATE_COLUMNS
     assert metadata["model_count"] == 2
+    assert metadata["model_profile"] == "local_safe"
+    assert metadata["hyperparameters"] == [
+        "AutoETS",
+        "DirectTabular",
+        "DynamicOptimizedTheta",
+        "RecursiveTabular",
+        "SeasonalNaive",
+    ]
 
 
 def test_evaluate_store_sales_predictor_returns_normalized_report(monkeypatch) -> None:

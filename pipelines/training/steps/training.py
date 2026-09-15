@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 from pathlib import Path
 from typing import Annotated, Any, Tuple  # noqa: UP035
@@ -39,10 +37,11 @@ def _log_mlflow_training(metadata: dict[str, Any]) -> None:
 def train_model(
     train_data: pd.DataFrame,
     prediction_length: int = 16,
-    presets: str = "best_quality",
+    presets: str = "high_quality",
     eval_metric: str = "RMSLE",
     time_limit: int | None = None,
     enable_ensemble: bool = True,
+    model_profile: str | None = "local_safe",
 ) -> Tuple[  # noqa: UP006
     Annotated[
         Path,
@@ -67,6 +66,7 @@ def train_model(
         eval_metric=eval_metric,
         time_limit=time_limit,
         enable_ensemble=enable_ensemble,
+        model_profile=model_profile,
     )
     _log_mlflow_training(metadata)
     log_metadata(

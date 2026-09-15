@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import os
 from typing import Annotated, Any, Tuple  # noqa: UP035
 
 import polars as pl
@@ -20,7 +19,15 @@ def resolve_feature_dataset(
     except Exception as exc:
         feature_uri = feature_uri_from_environment()
         if not feature_uri:
-            raise
+            requested = artifact_version or "latest"
+            artifact_name = os.getenv("FEATURE_ARTIFACT_NAME", "store_sales_features")
+            raise KeyError(
+                "Unable to load feature dataset artifact "
+                f"'{artifact_name}' version '{requested}'. "
+                "Run the data pipeline first, set TRAIN_FEATURE_VERSION to an "
+                "existing version, or provide TRAIN_FEATURE_URI for direct Parquet "
+                "fallback."
+            ) from exc
         metadata = {
             "source": "direct_uri",
             "feature_uri": feature_uri,
@@ -46,4 +53,5 @@ def load_dataset(
 ]:
     """Load feature data from ZenML, or direct URI when metadata is unavailable."""
 
-    return resolve_feature_dataset(artifact_version=artifact_version)
+    dataset, metadata = resolve_feature_dataset(artifact_version=artifact_version)
+    return dataset, metadata

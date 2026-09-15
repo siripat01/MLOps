@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 
-from dotenv import load_dotenv
 from zenml import pipeline
 from zenml.config import DockerSettings
 from zenml.orchestrators.local_docker.local_docker_orchestrator import (
@@ -14,15 +13,6 @@ from pipelines.training.steps.load_feature import load_dataset
 from pipelines.training.steps.prepare_split import prepare_training_data
 from pipelines.training.steps.split_data import split_data
 from pipelines.training.steps.training import train_model
-
-load_dotenv()
-
-# Docker step containers cannot reach the host through ``localhost``. Keep the
-# endpoint configurable while using the default Docker bridge gateway locally.
-os.environ.setdefault(
-    "ZENML_STORE_URL",
-    os.getenv("ZENML_DOCKER_STORE_URL", "http://172.17.0.1:8080"),
-)
 
 
 def _docker_feature_uri() -> str:
@@ -42,6 +32,7 @@ def _docker_feature_uri() -> str:
 def _docker_endpoint(env_name: str, default: str) -> str:
     value = os.getenv(env_name) or default
     return value.replace("localhost", "172.17.0.1")
+
 
 docker = DockerSettings(
     parent_image="pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
@@ -102,10 +93,11 @@ orchestrator_settings = LocalDockerOrchestratorSettings(
 def training_pipeline(
     artifact_version: str | None = None,
     prediction_length: int = 16,
-    presets: str = "best_quality",
+    presets: str = "high_quality",
     eval_metric: str = "RMSLE",
     time_limit: int | None = None,
     enable_ensemble: bool = True,
+    model_profile: str | None = "local_safe",
 ) -> None:
     dataset, _artifact_metadata = load_dataset(artifact_version=artifact_version)
     train_df, validate_df, _spliting_metadata = split_data(
@@ -124,6 +116,7 @@ def training_pipeline(
         eval_metric=eval_metric,
         time_limit=time_limit,
         enable_ensemble=enable_ensemble,
+        model_profile=model_profile,
     )
 
     evaluate_model(
@@ -138,15 +131,14 @@ def main() -> None:
     training_pipeline(
         artifact_version=os.getenv("TRAIN_FEATURE_VERSION") or None,
         prediction_length=int(os.getenv("PREDICTION_LENGTH", "16")),
-        presets=os.getenv("AUTOGLUON_PRESETS", "best_quality"),
+        presets=os.getenv("AUTOGLUON_PRESETS", "high_quality"),
         eval_metric=os.getenv("AUTOGLUON_EVAL_METRIC", "RMSLE"),
         time_limit=(
-            int(os.environ["AUTOGLUON_TIME_LIMIT"])
-            if os.getenv("AUTOGLUON_TIME_LIMIT")
-            else None
+            int(os.environ["AUTOGLUON_TIME_LIMIT"]) if os.getenv("AUTOGLUON_TIME_LIMIT") else None
         ),
         enable_ensemble=os.getenv("AUTOGLUON_ENABLE_ENSEMBLE", "true").lower()
         not in {"0", "false", "no"},
+        model_profile=os.getenv("AUTOGLUON_MODEL_PROFILE", "local_safe"),
     )
 
 
