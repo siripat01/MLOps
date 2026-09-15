@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 
-from dotenv import load_dotenv
 from zenml import pipeline
 from zenml.config import DockerSettings
 from zenml.orchestrators.local_docker.local_docker_orchestrator import (
@@ -18,8 +17,6 @@ from pipelines.data.steps.transform import transform_data
 from pipelines.data.steps.validate_cleaned import validate_cleaned_data
 from pipelines.data.steps.validate_features import validate_features
 from pipelines.data.steps.validate_raw import validate_raw_data
-
-load_dotenv()
 
 docker = DockerSettings(
     parent_image="python:3.12-slim",
