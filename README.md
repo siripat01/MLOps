@@ -62,27 +62,9 @@ GET  /metadata   loaded model metadata
 POST /predict    forecast request
 ```
 
-Example request:
-
-```bash
-curl -X POST http://localhost:8000/predict \
-  -H 'content-type: application/json' \
-  -d '{
-    "history": [{
-      "item_id": "1_AUTOMOTIVE",
-      "date": "2017-01-01",
-      "sales": 10,
-      "onpromotion": 0,
-      "is_holiday": false
-    }],
-    "known_covariates": [{
-      "item_id": "1_AUTOMOTIVE",
-      "date": "2017-01-02",
-      "onpromotion": 0,
-      "is_holiday": false
-    }]
-  }'
-```
+Example request: use the complete JSON body in the Postman section below. The
+`known_covariates` array must contain every future date required by the loaded
+model; a single future row is intentionally not a valid forecast request.
 
 ### Postman
 
@@ -149,11 +131,12 @@ Promotion validates that the artifact exists and writes a pointer such as:
 ```bash
 MODEL_VERSION=v19 \
 MODEL_URI=s3://ml-models/store-sales/v19/model.tar.gz \
+MODEL_SHA256=<archive-sha256> \
 PRODUCTION_POINTER_URI=s3://ml-models/store-sales/production.json \
 make promote-model
 ```
 
-The deployment system should consume the pointer, set `MODEL_URI`, roll out the unchanged image, wait for `/ready`, and smoke-test `/predict`. Rollback uses the same command with the previous immutable artifact URI:
+Promotion updates the immutable production pointer. Deploy the selected URI separately with `make deploy-model`, then wait for `/ready` and smoke-test `/predict`. Rollback uses the same promotion command with the previous immutable artifact URI:
 
 ```bash
 uv run python scripts/promote_model.py rollback \

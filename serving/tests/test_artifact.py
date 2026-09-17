@@ -67,3 +67,32 @@ def test_downloader_rejects_corrupt_archive(
     monkeypatch.setattr("app.artifact.boto3.client", lambda *_args, **_kwargs: FakeClient())
     with pytest.raises(tarfile.ReadError):
         ArtifactDownloader(tmp_path / "cache").download_and_extract("s3://bucket/model.tar.gz")
+
+
+def test_downloader_redownloads_when_model_uri_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloads: list[str] = []
+
+    source = tmp_path / "source"
+    (source / "model").mkdir(parents=True)
+    (source / "model" / "learner.pkl").write_bytes(b"model")
+    (source / "manifest.json").write_text(
+        json.dumps({"model_name": "store-sales"}), encoding="utf-8"
+    )
+    archive = tmp_path / "source.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(source / "model", arcname="model")
+        tar.add(source / "manifest.json", arcname="manifest.json")
+
+    class FakeClient:
+        def download_file(self, bucket: str, key: str, filename: str) -> None:
+            downloads.append(f"{bucket}/{key}")
+            Path(filename).write_bytes(archive.read_bytes())
+
+    monkeypatch.setattr("app.artifact.boto3.client", lambda *_args, **_kwargs: FakeClient())
+    downloader = ArtifactDownloader(tmp_path / "cache")
+    downloader.download_and_extract("s3://bucket/v1/model.tar.gz")
+    downloader.download_and_extract("s3://bucket/v2/model.tar.gz")
+
+    assert downloads == ["bucket/v1/model.tar.gz", "bucket/v2/model.tar.gz"]

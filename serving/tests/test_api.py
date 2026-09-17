@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import app
-from app.schemas import ModelMetadata
+from app.model import validate_prediction_request
+from app.schemas import ModelMetadata, PredictionRequest
 
 
 def payload() -> dict:
@@ -41,6 +42,35 @@ def test_predict_uses_loaded_model() -> None:
     response = TestClient(app).post("/predict", json=payload())
     assert response.status_code == 200
     assert response.json() == {"predictions": []}
+
+
+def test_predict_maps_model_input_errors_to_422() -> None:
+    class RejectingModel:
+        def predict(self, request):
+            raise ValueError("known_covariates horizon is invalid")
+
+    app.state.model = RejectingModel()
+    response = TestClient(app).post("/predict", json=payload())
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "known_covariates horizon is invalid"
+
+
+def test_prediction_validation_requires_full_future_horizon() -> None:
+    request = PredictionRequest(**payload())
+
+    with pytest.raises(ValueError, match="16 future"):
+        validate_prediction_request(request, prediction_length=16)
+
+
+def test_prediction_validation_rejects_mismatched_items() -> None:
+    request = PredictionRequest(
+        history=[{"item_id": "1", "date": "2024-01-01", "sales": 10}],
+        known_covariates=[{"item_id": "2", "date": "2024-01-02"}],
+    )
+
+    with pytest.raises(ValueError, match="item_id"):
+        validate_prediction_request(request, prediction_length=1)
 
 
 def test_lifespan_loads_model_before_ready(monkeypatch, tmp_path) -> None:

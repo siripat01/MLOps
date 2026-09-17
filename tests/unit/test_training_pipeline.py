@@ -63,6 +63,22 @@ def test_feature_resolution_falls_back_to_direct_uri(monkeypatch) -> None:
     assert metadata["requested_artifact_version"] == "5"
 
 
+def test_feature_resolution_does_not_hide_unexpected_artifact_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        load_feature,
+        "get_feature_artifact",
+        lambda version=None: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+    monkeypatch.setattr(load_feature, "feature_uri_from_environment", lambda: "s3://features")
+
+    try:
+        load_feature.resolve_feature_dataset(artifact_version="5")
+    except RuntimeError as exc:
+        assert str(exc) == "db down"
+    else:
+        raise AssertionError("unexpected artifact errors must not silently fall back")
+
+
 def test_training_docker_feature_uri_uses_dataset_version(monkeypatch) -> None:
     monkeypatch.setenv("DATASET_VERSION", "local-dev")
     monkeypatch.delenv("FEATURE_DATA_VERSION", raising=False)
@@ -74,6 +90,16 @@ def test_training_docker_feature_uri_uses_dataset_version(monkeypatch) -> None:
         training_main._docker_feature_uri()
         == "s3://zenml/features/store-sales/local-dev/features.parquet"
     )
+
+
+def test_quality_gate_threshold_env_values_are_optional(monkeypatch) -> None:
+    from pipelines.training import main as training_main
+
+    monkeypatch.setenv("QUALITY_GATE_MAX_WQL", "0.42")
+    monkeypatch.delenv("QUALITY_GATE_MAX_RMSE", raising=False)
+
+    assert training_main._optional_float_env("QUALITY_GATE_MAX_WQL") == 0.42
+    assert training_main._optional_float_env("QUALITY_GATE_MAX_RMSE") is None
 
 
 def test_training_docker_reuses_parent_torch_and_uv_cache() -> None:

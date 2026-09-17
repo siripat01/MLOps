@@ -37,7 +37,10 @@ train-pipeline: push-training-image
 	TRAINING_RUNNER_IMAGE=$(TRAINING_RUNNER_IMAGE) uv run --env-file=.env run-training-pipeline
 
 promote-model:
-	uv run python scripts/promote_model.py promote --version "$${MODEL_VERSION}" --artifact-uri "$${MODEL_URI}" --pointer-uri "$${PRODUCTION_POINTER_URI}"
+	uv run python scripts/promote_model.py promote --version "$${MODEL_VERSION}" --artifact-uri "$${MODEL_URI}" --pointer-uri "$${PRODUCTION_POINTER_URI}" $${MODEL_SHA256:+--archive-sha256 "$${MODEL_SHA256}"}
+
+deploy-model:
+	MODEL_URI=$${MODEL_URI:?MODEL_URI is required} make serve-api
 
 serve-api:
 	SERVING_IMAGE=$${SERVING_IMAGE:-autogluon-server:1.0.0} \

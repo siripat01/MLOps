@@ -33,17 +33,17 @@ def upload_model(
     secret_key: str | None = None,
     region: str = "us-east-1",
 ) -> ModelPublication:
-    model_uri = build_model_uri(bucket, model_name, packaged.model_version)
-    key = model_uri.removeprefix(f"s3://{bucket}/")
-    client = boto3.client(
-        "s3",
-        endpoint_url=endpoint_url or None,
-        aws_access_key_id=access_key or None,
-        aws_secret_access_key=secret_key or None,
-        region_name=region,
+    return upload_model_archive(
+        packaged.archive_path,
+        model_version=packaged.model_version,
+        archive_sha256=packaged.archive_sha256,
+        bucket=bucket,
+        model_name=model_name,
+        endpoint_url=endpoint_url,
+        access_key=access_key,
+        secret_key=secret_key,
+        region=region,
     )
-    client.upload_file(str(packaged.archive_path), bucket, key)
-    return ModelPublication(model_uri, packaged.model_version, packaged.archive_sha256)
 
 
 def upload_model_archive(

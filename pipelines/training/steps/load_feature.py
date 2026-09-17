@@ -16,7 +16,7 @@ def resolve_feature_dataset(
 ) -> tuple[pl.DataFrame, dict[str, Any]]:
     try:
         artifact = get_feature_artifact(version=artifact_version)
-    except Exception as exc:
+    except KeyError as exc:
         feature_uri = feature_uri_from_environment()
         if not feature_uri:
             requested = artifact_version or "latest"

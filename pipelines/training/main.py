@@ -41,6 +41,11 @@ def _docker_endpoint(env_name: str, default: str) -> str:
     return value.replace("localhost", "172.17.0.1")
 
 
+def _optional_float_env(name: str) -> float | None:
+    value = os.getenv(name, "").strip()
+    return float(value) if value else None
+
+
 docker = DockerSettings(
     parent_image=TRAINING_RUNNER_IMAGE,
     # The runner image already contains all dependencies. Using pip here avoids
@@ -98,6 +103,8 @@ def training_pipeline(
     time_limit: int | None = None,
     enable_ensemble: bool = True,
     model_profile: str | None = "local_safe",
+    max_wql: float | None = None,
+    max_rmse: float | None = None,
     model_name: str = "store-sales",
     model_version: str | None = None,
 ) -> tuple[str, str, dict[str, float]]:
@@ -130,6 +137,8 @@ def training_pipeline(
     gate_passed, gate_metrics, _gate_thresholds = quality_gate(
         metrics=metrics,
         max_rmsle=float(os.getenv("QUALITY_GATE_MAX_RMSLE", "0.75")),
+        max_wql=max_wql,
+        max_rmse=max_rmse,
     )
     archive_path, packaged_model_version, archive_sha256 = package_model_step(
         model_path,
@@ -137,6 +146,7 @@ def training_pipeline(
         model_version=model_version or f"v{int(time.time())}",
         artifact_root=os.getenv("MODEL_PACKAGE_ROOT", "/tmp/model-publication"),
         quality_gate_passed=gate_passed,
+        prediction_length=prediction_length,
     )
     model_uri, published_model_version, _archive_sha256 = upload_model_step(
         archive_path,
@@ -164,6 +174,8 @@ def main() -> None:
         enable_ensemble=os.getenv("AUTOGLUON_ENABLE_ENSEMBLE", "true").lower()
         not in {"0", "false", "no"},
         model_profile=os.getenv("AUTOGLUON_MODEL_PROFILE", "local_safe"),
+        max_wql=_optional_float_env("QUALITY_GATE_MAX_WQL"),
+        max_rmse=_optional_float_env("QUALITY_GATE_MAX_RMSE"),
         model_name=os.getenv("MODEL_NAME", "store-sales"),
         model_version=os.getenv("MODEL_VERSION") or None,
     )

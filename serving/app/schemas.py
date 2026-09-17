@@ -53,3 +53,4 @@ class ModelMetadata(BaseModel):
     autogluon_version: str
     python_version: str
     artifact_sha256: str
+    prediction_length: int = 16

@@ -62,4 +62,7 @@ def predict(request: PredictionRequest, http_request: Request) -> PredictionResp
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not ready"
         )
-    return http_request.app.state.model.predict(request)
+    try:
+        return http_request.app.state.model.predict(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

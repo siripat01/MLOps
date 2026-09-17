@@ -53,6 +53,7 @@ def package_model(
     model_name: str,
     model_version: str,
     artifact_root: Path,
+    prediction_length: int = 16,
 ) -> PackagedModel:
     source = Path(model_path).resolve()
     if not source.is_dir():
@@ -74,6 +75,7 @@ def package_model(
         "autogluon_version": _autogluon_version(),
         "python_version": ".".join(map(str, sys.version_info[:3])),
         "artifact_sha256": _sha256_directory(model_target),
+        "prediction_length": prediction_length,
     }
     manifest_path = work_dir / "manifest.json"
     manifest_path.write_text(
@@ -102,6 +104,7 @@ def package_model_step(
     model_version: str,
     artifact_root: str = "artifacts/model-publication",
     quality_gate_passed: bool = True,
+    prediction_length: int = 16,
 ) -> tuple[
     Annotated[Path, "archive_path"],
     Annotated[str, "model_version"],
@@ -114,6 +117,7 @@ def package_model_step(
         model_name=model_name,
         model_version=model_version,
         artifact_root=Path(artifact_root),
+        prediction_length=prediction_length,
     )
     # Return the archive as a ZenML Path artifact. A raw path embedded in a
     # dataclass points to the previous step's container and is not portable.

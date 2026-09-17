@@ -30,6 +30,7 @@ def test_package_model_contains_complete_predictor_and_manifest(tmp_path: Path) 
         model_name="store-sales",
         model_version="v19",
         artifact_root=tmp_path / "artifacts",
+        prediction_length=16,
     )
 
     with tarfile.open(packaged.archive_path, "r:gz") as archive:
@@ -45,6 +46,7 @@ def test_package_model_contains_complete_predictor_and_manifest(tmp_path: Path) 
     assert manifest["model_name"] == "store-sales"
     assert manifest["model_version"] == "v19"
     assert manifest["framework"] == "autogluon-timeseries"
+    assert manifest["prediction_length"] == 16
     assert manifest["artifact_sha256"] == packaged.model_sha256
     assert len(packaged.archive_sha256) == 64
 

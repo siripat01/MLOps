@@ -8,7 +8,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -108,7 +108,7 @@ services:
 
   forecast-api:
     profiles: ["serving"]
-    image: ${SERVING_IMAGE:-ghcr.io/example/autogluon-server:1.0.0}
+    image: ${SERVING_IMAGE:-autogluon-server:1.0.0}
     container_name: store_sales_forecast
     environment:
       MODEL_URI: ${MODEL_URI:?MODEL_URI must identify an S3 model artifact}
@@ -119,7 +119,15 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-minio}
       S3_REGION: ${S3_REGION:-us-east-1}
     ports:
-      - "${SERVING_PUBLISHED_PORT:-8000}:8000"
+      - "127.0.0.1:${SERVING_PUBLISHED_PORT:-8000}:8000"
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-create-buckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    mem_limit: ${SERVING_MEMORY_LIMIT:-8g}
+    cpus: ${SERVING_CPU_LIMIT:-4}
     healthcheck:
       test:
         - CMD
@@ -129,6 +137,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 30s
     networks:
       - zenml-network
 

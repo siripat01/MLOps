@@ -6,9 +6,10 @@ from scripts.promote_model import build_pointer, parse_s3_uri, promote_model
 
 
 def test_build_pointer() -> None:
-    assert build_pointer("v19", "s3://ml-models/store-sales/v19/model.tar.gz") == {
+    assert build_pointer("v19", "s3://ml-models/store-sales/v19/model.tar.gz", "a" * 64) == {
         "version": "v19",
         "artifact_uri": "s3://ml-models/store-sales/v19/model.tar.gz",
+        "archive_sha256": "a" * 64,
     }
 
 
@@ -34,9 +35,10 @@ def test_promote_model_validates_and_writes_pointer(monkeypatch: pytest.MonkeyPa
         version="v19",
         artifact_uri="s3://ml-models/store-sales/v19/model.tar.gz",
         pointer_uri="s3://ml-models/store-sales/production.json",
+        archive_sha256="a" * 64,
     )
 
     assert calls[0] == ("head", "ml-models", b"store-sales/v19/model.tar.gz")
     assert json.loads(calls[1][2]) == build_pointer(
-        "v19", "s3://ml-models/store-sales/v19/model.tar.gz"
+        "v19", "s3://ml-models/store-sales/v19/model.tar.gz", "a" * 64
     )

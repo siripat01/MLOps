@@ -63,10 +63,23 @@ class ArtifactDownloader:
         archive_path = self.cache_dir / "model.tar.gz"
         model_dir = self.cache_dir / "model"
         manifest_path = self.cache_dir / "manifest.json"
+        marker_path = self.cache_dir / "cache-key.json"
 
-        if not archive_path.exists() or (
+        cache_key = {"uri": uri, "expected_sha256": expected_sha256}
+        cached_key = None
+        if marker_path.is_file():
+            try:
+                cached_key = json.loads(marker_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                cached_key = None
+        cache_matches = cached_key == cache_key
+
+        if not cache_matches or not archive_path.exists() or (
             expected_sha256 and sha256_file(archive_path) != expected_sha256
         ):
+            if model_dir.exists():
+                shutil.rmtree(model_dir)
+            manifest_path.unlink(missing_ok=True)
             self.client.download_file(bucket, key, str(archive_path))
         if expected_sha256 and sha256_file(archive_path) != expected_sha256:
             raise ValueError("Downloaded model artifact checksum does not match MODEL_SHA256")
@@ -83,6 +96,7 @@ class ArtifactDownloader:
         expected_model_sha256 = manifest.get("artifact_sha256")
         if expected_model_sha256 and sha256_directory(model_dir) != expected_model_sha256:
             raise ValueError("Extracted model checksum does not match manifest.json")
+        marker_path.write_text(json.dumps(cache_key, sort_keys=True), encoding="utf-8")
         return model_dir, manifest
 
     @staticmethod

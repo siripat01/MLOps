@@ -20,10 +20,15 @@ def parse_s3_uri(uri: str) -> tuple[str, str]:
     return bucket, key
 
 
-def build_pointer(version: str, artifact_uri: str) -> dict[str, str]:
+def build_pointer(
+    version: str, artifact_uri: str, archive_sha256: str | None = None
+) -> dict[str, str]:
     if not version or not artifact_uri:
         raise ValueError("version and artifact_uri are required")
-    return {"version": version, "artifact_uri": artifact_uri}
+    pointer = {"version": version, "artifact_uri": artifact_uri}
+    if archive_sha256:
+        pointer["archive_sha256"] = archive_sha256
+    return pointer
 
 
 @dataclass(frozen=True)
@@ -39,6 +44,7 @@ def promote_model(
     version: str,
     artifact_uri: str,
     pointer_uri: str,
+    archive_sha256: str | None = None,
     config: PromotionConfig | None = None,
 ) -> None:
     config = config or PromotionConfig()
@@ -51,11 +57,12 @@ def promote_model(
         aws_secret_access_key=config.secret_key,
         region_name=config.region,
     )
-    client.head_object(Bucket=artifact_bucket, Key=artifact_key)
+    head = client.head_object(Bucket=artifact_bucket, Key=artifact_key)
+    archive_sha256 = archive_sha256 or head.get("Metadata", {}).get("archive_sha256")
     client.put_object(
         Bucket=pointer_bucket,
         Key=pointer_key,
-        Body=json.dumps(build_pointer(version, artifact_uri), indent=2).encode(),
+        Body=json.dumps(build_pointer(version, artifact_uri, archive_sha256), indent=2).encode(),
         ContentType="application/json",
     )
 
@@ -79,6 +86,7 @@ def main() -> None:
     parser.add_argument("--version", required=True)
     parser.add_argument("--artifact-uri", required=True)
     parser.add_argument("--pointer-uri", required=True)
+    parser.add_argument("--archive-sha256")
     args = parser.parse_args()
     config = PromotionConfig(
         endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
@@ -90,6 +98,7 @@ def main() -> None:
         version=args.version,
         artifact_uri=args.artifact_uri,
         pointer_uri=args.pointer_uri,
+        archive_sha256=args.archive_sha256,
         config=config,
     )
     rollout_url = os.getenv("SERVING_BASE_URL")

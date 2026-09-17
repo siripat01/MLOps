@@ -38,18 +38,22 @@ KNOWN_COVARIATES = (
 def _add_known_covariates(frame: pd.DataFrame) -> pd.DataFrame:
     enriched = frame.copy()
     timestamps = pd.to_datetime(enriched["date"])
-    enriched["onpromotion"] = pd.to_numeric(enriched.get("onpromotion", 0), errors="coerce").fillna(
-        0
-    )
-    enriched["is_holiday"] = enriched.get("is_holiday", False).fillna(False).astype(bool)
+    if "onpromotion" not in enriched:
+        enriched["onpromotion"] = 0
+    if "is_holiday" not in enriched:
+        enriched["is_holiday"] = False
+    if "holiday_count" not in enriched:
+        enriched["holiday_count"] = enriched["is_holiday"].astype(int)
+    if "holiday_type" not in enriched:
+        enriched["holiday_type"] = "NONE"
+    enriched["onpromotion"] = pd.to_numeric(enriched["onpromotion"], errors="coerce").fillna(0)
+    enriched["is_holiday"] = enriched["is_holiday"].fillna(False).astype(bool)
     enriched["holiday_count"] = (
-        pd.to_numeric(
-            enriched.get("holiday_count", enriched["is_holiday"].astype(int)), errors="coerce"
-        )
+        pd.to_numeric(enriched["holiday_count"], errors="coerce")
         .fillna(0)
         .astype("int64")
     )
-    holiday_type = enriched.get("holiday_type", "NONE").fillna("NONE").astype(str).str.upper()
+    holiday_type = enriched["holiday_type"].fillna("NONE").astype(str).str.upper()
     enriched["is_onpromotion"] = enriched["onpromotion"] > 0
     enriched["promotion_log1p"] = np.log1p(enriched["onpromotion"].clip(lower=0))
     enriched["promotion_capped_10"] = (
@@ -87,6 +91,7 @@ class AutoGluonModel:
         return self._metadata
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
+        validate_prediction_request(request, self._metadata.prediction_length)
         history = _to_timeseries(request.history, include_sales=True)
         known = _to_timeseries(request.known_covariates, include_sales=False)
         predictions = self.predictor.predict(history, known_covariates=known)
@@ -101,6 +106,39 @@ class AutoGluonModel:
                 for row in rows
             ]
         )
+
+
+def validate_prediction_request(request: PredictionRequest, prediction_length: int) -> None:
+    if prediction_length < 1:
+        raise ValueError("model prediction_length must be positive")
+
+    history = pd.DataFrame(point.model_dump() for point in request.history)
+    known = pd.DataFrame(point.model_dump() for point in request.known_covariates)
+    history["date"] = pd.to_datetime(history["date"])
+    known["date"] = pd.to_datetime(known["date"])
+    history_items = set(history["item_id"])
+    known_items = set(known["item_id"])
+    if known_items != history_items:
+        raise ValueError(
+            "known_covariates item_id values must exactly match history item_id values"
+        )
+
+    for item_id, item_history in history.groupby("item_id"):
+        if item_history["date"].duplicated().any():
+            raise ValueError(f"history contains duplicate dates for item_id={item_id}")
+        item_known = known.loc[known["item_id"] == item_id]
+        if item_known["date"].duplicated().any():
+            raise ValueError(f"known_covariates contains duplicate dates for item_id={item_id}")
+        last_date = item_history["date"].max()
+        expected = pd.date_range(
+            last_date + pd.Timedelta(1, unit="D"), periods=prediction_length, freq="D"
+        )
+        actual = pd.DatetimeIndex(item_known["date"].sort_values())
+        if len(actual) != prediction_length or not actual.equals(expected):
+            raise ValueError(
+                f"known_covariates must contain the next {prediction_length} future daily dates "
+                f"after history for item_id={item_id}"
+            )
 
 
 def _to_timeseries(points: list[Any], *, include_sales: bool) -> TimeSeriesDataFrame:
