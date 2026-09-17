@@ -76,6 +76,31 @@ def test_training_docker_feature_uri_uses_dataset_version(monkeypatch) -> None:
     )
 
 
+def test_training_docker_reuses_parent_torch_and_uv_cache() -> None:
+    from pipelines.training import main as training_main
+
+    requirements = set(training_main.docker.requirements or [])
+
+    assert training_main.docker.parent_image == (
+        "docker.io/siripat007/zenml:training-runner-autogluon-1.6.1-torch2.10"
+    )
+    assert training_main.docker.python_package_installer.value == "pip"
+    assert training_main.docker.install_stack_requirements is False
+    assert training_main.docker.local_project_install_command == (
+        "uv pip install --system --break-system-packages --no-deps -e ."
+    )
+    assert training_main.docker.python_package_installer_cache_mount is None
+    assert "torch==2.13.0" not in requirements
+    assert "torchvision==0.28.0" not in requirements
+    assert requirements == set()
+
+
+def test_training_runner_dockerfile_allows_installing_into_base_python() -> None:
+    dockerfile = Path("infrastructure/docker/training-runner.Dockerfile").read_text()
+
+    assert "uv pip install --system --break-system-packages" in dockerfile
+
+
 def test_train_store_sales_predictor_returns_metadata(monkeypatch) -> None:
     class FakePredictor:
         model_best = "WeightedEnsemble"

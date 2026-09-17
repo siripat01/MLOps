@@ -27,8 +27,7 @@ def split_data(
 
     if missing_columns:
         raise ValueError(
-            f"Missing required columns for time-series split: "
-            f"{sorted(missing_columns)}"
+            f"Missing required columns for time-series split: {sorted(missing_columns)}"
         )
 
     if prediction_length <= 0:
@@ -37,53 +36,34 @@ def split_data(
     df = df.sort(["item_id", "date"])
 
     # Each item should have at most one observation per date.
-    duplicate_rows = (
-        df.group_by(["item_id", "date"])
-        .len()
-        .filter(pl.col("len") > 1)
-    )
+    duplicate_rows = df.group_by(["item_id", "date"]).len().filter(pl.col("len") > 1)
 
     if duplicate_rows.height > 0:
-        raise ValueError(
-            "Duplicate (item_id, date) rows found before train/validation split"
-        )
+        raise ValueError("Duplicate (item_id, date) rows found before train/validation split")
 
-    max_date = df.select(
-        pl.col("date").max()
-    ).item()
+    max_date = df.select(pl.col("date").max()).item()
 
-    min_date = df.select(
-        pl.col("date").min()
-    ).item()
+    min_date = df.select(pl.col("date").min()).item()
 
     if max_date is None or min_date is None:
         raise ValueError("Dataset has no valid dates")
 
-    validation_start = max_date - timedelta(
-        days=prediction_length - 1
-    )
+    validation_start = max_date - timedelta(days=prediction_length - 1)
 
-    train_df = df.filter(
-        pl.col("date") < validation_start
-    )
+    train_df = df.filter(pl.col("date") < validation_start)
 
-    validation_df = df.filter(
-        pl.col("date") >= validation_start
-    )
+    validation_df = df.filter(pl.col("date") >= validation_start)
 
     if train_df.is_empty():
         raise ValueError(
-            "Training split is empty. "
-            "Reduce prediction_length or provide more historical data."
+            "Training split is empty. Reduce prediction_length or provide more historical data."
         )
 
     if validation_df.is_empty():
         raise ValueError("Validation split is empty")
 
     # Make sure validation really contains the requested number of dates.
-    validation_date_count = validation_df.select(
-        pl.col("date").n_unique()
-    ).item()
+    validation_date_count = validation_df.select(pl.col("date").n_unique()).item()
 
     if validation_date_count != prediction_length:
         raise ValueError(
@@ -93,18 +73,12 @@ def split_data(
         )
 
     # Every series should have the full validation horizon.
-    validation_coverage = (
-        validation_df.group_by("item_id")
-        .agg(
-            pl.col("date")
-            .n_unique()
-            .alias("validation_observations")
-        )
+    validation_coverage = validation_df.group_by("item_id").agg(
+        pl.col("date").n_unique().alias("validation_observations")
     )
 
     incomplete_validation = validation_coverage.filter(
-        pl.col("validation_observations")
-        != prediction_length
+        pl.col("validation_observations") != prediction_length
     )
 
     if incomplete_validation.height > 0:
@@ -117,16 +91,10 @@ def split_data(
         )
 
     # Ensure every series has enough training history.
-    train_coverage = (
-        train_df.group_by("item_id")
-        .agg(
-            pl.len().alias("train_observations")
-        )
-    )
+    train_coverage = train_df.group_by("item_id").agg(pl.len().alias("train_observations"))
 
     insufficient_history = train_coverage.filter(
-        pl.col("train_observations")
-        < min_train_observations
+        pl.col("train_observations") < min_train_observations
     )
 
     if insufficient_history.height > 0:
@@ -149,18 +117,12 @@ def split_data(
         )
 
     metadata = {
-        "source_artifact_name": dataset_metadata.get(
-            "artifact_name"
-        ),
-        "source_artifact_version": dataset_metadata.get(
-            "artifact_version"
-        ),
+        "source_artifact_name": dataset_metadata.get("artifact_name"),
+        "source_artifact_version": dataset_metadata.get("artifact_version"),
         "prediction_length": prediction_length,
         "dataset_start": str(min_date),
         "dataset_end": str(max_date),
-        "train_end": str(
-            validation_start - timedelta(days=1)
-        ),
+        "train_end": str(validation_start - timedelta(days=1)),
         "validation_start": str(validation_start),
         "validation_end": str(max_date),
         "train_rows": train_df.height,

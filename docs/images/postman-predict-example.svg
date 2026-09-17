@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Postman prediction request example</title>
+  <desc id="desc">A compact visual example of a POST request to the forecast API with history and sixteen known covariate days.</desc>
+  <rect width="1200" height="760" fill="#17191f"/>
+  <rect x="24" y="22" width="1152" height="62" rx="8" fill="#242832"/>
+  <circle cx="54" cy="53" r="9" fill="#ff6b6b"/>
+  <circle cx="84" cy="53" r="9" fill="#ffd166"/>
+  <circle cx="114" cy="53" r="9" fill="#06d6a0"/>
+  <text x="150" y="60" fill="#f4f7fb" font-family="Arial, sans-serif" font-size="24" font-weight="700">Postman — forecast prediction</text>
+
+  <rect x="48" y="112" width="110" height="52" rx="6" fill="#ff6c37"/>
+  <text x="77" y="146" fill="white" font-family="Arial, sans-serif" font-size="22" font-weight="700">POST</text>
+  <rect x="170" y="112" width="960" height="52" rx="6" fill="#2b303b"/>
+  <text x="194" y="146" fill="#e7edf5" font-family="monospace" font-size="21">http://localhost:8000/predict</text>
+
+  <text x="52" y="205" fill="#9aa5b5" font-family="Arial, sans-serif" font-size="18">Headers</text>
+  <rect x="48" y="220" width="1082" height="44" rx="5" fill="#20242c"/>
+  <text x="70" y="249" fill="#8bd5ff" font-family="monospace" font-size="18">Content-Type</text>
+  <text x="270" y="249" fill="#e7edf5" font-family="monospace" font-size="18">application/json</text>
+
+  <text x="52" y="307" fill="#9aa5b5" font-family="Arial, sans-serif" font-size="18">Body · raw · JSON</text>
+  <rect x="48" y="322" width="1082" height="370" rx="7" fill="#0f1115" stroke="#343b48"/>
+  <text x="75" y="361" fill="#f4f7fb" font-family="monospace" font-size="19">{</text>
+  <text x="98" y="395" fill="#8bd5ff" font-family="monospace" font-size="18">"history"</text>
+  <text x="220" y="395" fill="#f4f7fb" font-family="monospace" font-size="18">: [{</text>
+  <text x="245" y="428" fill="#b9e769" font-family="monospace" font-size="17">"item_id": "1_AUTOMOTIVE",</text>
+  <text x="245" y="458" fill="#b9e769" font-family="monospace" font-size="17">"date": "2017-01-01", "sales": 10,</text>
+  <text x="245" y="488" fill="#b9e769" font-family="monospace" font-size="17">"onpromotion": 0, "is_holiday": false</text>
+  <text x="220" y="520" fill="#f4f7fb" font-family="monospace" font-size="18">}],</text>
+  <text x="98" y="558" fill="#8bd5ff" font-family="monospace" font-size="18">"known_covariates"</text>
+  <text x="335" y="558" fill="#f4f7fb" font-family="monospace" font-size="18">: [{</text>
+  <text x="360" y="591" fill="#b9e769" font-family="monospace" font-size="17">"item_id": "1_AUTOMOTIVE",</text>
+  <text x="360" y="621" fill="#b9e769" font-family="monospace" font-size="17">"date": "2017-01-08", "onpromotion": 0,</text>
+  <text x="360" y="651" fill="#b9e769" font-family="monospace" font-size="17">"is_holiday": false</text>
+  <text x="335" y="681" fill="#f4f7fb" font-family="monospace" font-size="18">}, ... 16 future dates ...]</text>
+  <text x="75" y="681" fill="#f4f7fb" font-family="monospace" font-size="18">}</text>
+</svg>

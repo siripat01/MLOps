@@ -71,9 +71,7 @@ def train_model(
     _log_mlflow_training(metadata)
     log_metadata(
         metadata={
-            "training": {
-                key: value for key, value in metadata.items() if key != "leaderboard"
-            }
+            "training": {key: value for key, value in metadata.items() if key != "leaderboard"}
         }
     )
     return model_path, metadata

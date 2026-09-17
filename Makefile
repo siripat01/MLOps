@@ -1,4 +1,6 @@
-.PHONY: install test lint format quality-gate dev-stack-up data-pipeline train-pipeline deploy-build-pipeline serve-api clean
+.PHONY: install test lint format quality-gate dev-stack-up data-pipeline build-training-image push-training-image train-pipeline promote-model serve-api build-serving-image clean
+
+TRAINING_RUNNER_IMAGE ?= docker.io/siripat007/zenml:training-runner-autogluon-1.6.1-torch2.10
 
 install:
 	uv sync --extra dev
@@ -12,24 +14,41 @@ lint:
 quality-gate: lint test
 
 dev-stack-up:
-	docker compose -f infrastructure/docker/docker-compose.yml up -d mysql zenml mlflow minio minio-create-buckets
-	uv run python scripts/wait_for_zenml.py
+	docker compose -f infrastructure/docker/docker-compose.yml up --build
+	uv run --env-file=.env.example python scripts/wait_for_zenml.py
 
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
 
-data-pipeline: dev-stack-up
-	uv run run-data-pipeline
+data-pipeline:
+	uv run --env-file=.env run-data-pipeline
 
-train-pipeline: dev-stack-up
-	uv run run-training-pipeline
+build-training-image:
+	DOCKER_BUILDKIT=1 docker build \
+		-f infrastructure/docker/training-runner.Dockerfile \
+		-t $(TRAINING_RUNNER_IMAGE) \
+		.
 
-deploy-build-pipeline:
-	uv run run-deployment-pipeline
+push-training-image: build-training-image
+	docker push $(TRAINING_RUNNER_IMAGE)
+
+train-pipeline: push-training-image
+	TRAINING_RUNNER_IMAGE=$(TRAINING_RUNNER_IMAGE) uv run --env-file=.env run-training-pipeline
+
+promote-model:
+	uv run python scripts/promote_model.py promote --version "$${MODEL_VERSION}" --artifact-uri "$${MODEL_URI}" --pointer-uri "$${PRODUCTION_POINTER_URI}"
 
 serve-api:
-	docker compose -f infrastructure/docker/docker-compose.yml --profile serving up forecast-api
+	SERVING_IMAGE=$${SERVING_IMAGE:-autogluon-server:1.0.0} \
+	S3_ENDPOINT_URL=$${S3_ENDPOINT_URL:-http://minio:9000} \
+	S3_ACCESS_KEY=$${S3_ACCESS_KEY:-minioadmin} \
+	S3_SECRET_KEY=$${S3_SECRET_KEY:-local-dev-minio} \
+	docker compose -f infrastructure/docker/docker-compose.yml \
+		--profile serving up -d --force-recreate forecast-api
+
+build-serving-image:
+	docker build -f serving/Dockerfile -t $${SERVING_IMAGE:-autogluon-server:1.0.0} serving
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

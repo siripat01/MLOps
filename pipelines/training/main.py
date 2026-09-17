@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from zenml import pipeline
 from zenml.config import DockerSettings
@@ -10,16 +11,22 @@ from zenml.orchestrators.local_docker.local_docker_orchestrator import (
 
 from pipelines.training.steps.eval import evaluate_model
 from pipelines.training.steps.load_feature import load_dataset
+from pipelines.training.steps.package_model import package_model_step
 from pipelines.training.steps.prepare_split import prepare_training_data
+from pipelines.training.steps.quality_gate import quality_gate
 from pipelines.training.steps.split_data import split_data
 from pipelines.training.steps.training import train_model
+from pipelines.training.steps.upload_model import upload_model_step
+
+TRAINING_RUNNER_IMAGE = os.getenv(
+    "TRAINING_RUNNER_IMAGE",
+    "docker.io/siripat007/zenml:training-runner-autogluon-1.6.1-torch2.10",
+)
 
 
 def _docker_feature_uri() -> str:
     feature_version = (
-        os.getenv("FEATURE_DATA_VERSION")
-        or os.getenv("DATASET_VERSION")
-        or "local-dev"
+        os.getenv("FEATURE_DATA_VERSION") or os.getenv("DATASET_VERSION") or "local-dev"
     )
     return os.getenv("TRAIN_FEATURE_URI") or (
         f"s3://{os.getenv('S3_BUCKET', 'zenml')}/"
@@ -35,26 +42,19 @@ def _docker_endpoint(env_name: str, default: str) -> str:
 
 
 docker = DockerSettings(
-    parent_image="pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime",
-    python_package_installer="uv",
-    python_package_installer_args={
-        "system": None,
-    },
-    requirements=[
-        "zenml==0.96.4",
-        "autogluon.timeseries==1.6.1",
-        "mlflow>=2.1.1,<4",
-        "torch==2.13.0",
-        "torchvision==0.28.0",
-        "numpy",
-        "pandas",
-        "polars",
-        "pyarrow",
-        "s3fs",
-    ],
+    parent_image=TRAINING_RUNNER_IMAGE,
+    # The runner image already contains all dependencies. Using pip here avoids
+    # ZenML bootstrapping uv with a failing `pip install uv` layer.
+    python_package_installer="pip",
+    install_stack_requirements=False,
+    # The runner image already contains all runtime dependencies. Keeping this
+    # empty prevents every ZenML step image build from downloading AutoGluon.
+    requirements=[],
     target_repository="zenml",
     prevent_build_reuse=False,
-    local_project_install_command="pip install --no-deps -e .",
+    local_project_install_command=(
+        "uv pip install --system --break-system-packages --no-deps -e ."
+    ),
     environment={
         "PYTHONPATH": "/app/code/src:/app/code",
         "MPLCONFIGDIR": "/tmp/matplotlib",
@@ -98,7 +98,9 @@ def training_pipeline(
     time_limit: int | None = None,
     enable_ensemble: bool = True,
     model_profile: str | None = "local_safe",
-) -> None:
+    model_name: str = "store-sales",
+    model_version: str | None = None,
+) -> tuple[str, str, dict[str, float]]:
     dataset, _artifact_metadata = load_dataset(artifact_version=artifact_version)
     train_df, validate_df, _spliting_metadata = split_data(
         df=dataset,
@@ -119,12 +121,35 @@ def training_pipeline(
         model_profile=model_profile,
     )
 
-    evaluate_model(
+    metrics = evaluate_model(
         model_path,
         train_ts,
         validation_ts,
         training_metadata,
     )
+    gate_passed, gate_metrics, _gate_thresholds = quality_gate(
+        metrics=metrics,
+        max_rmsle=float(os.getenv("QUALITY_GATE_MAX_RMSLE", "0.75")),
+    )
+    archive_path, packaged_model_version, archive_sha256 = package_model_step(
+        model_path,
+        model_name=model_name,
+        model_version=model_version or f"v{int(time.time())}",
+        artifact_root=os.getenv("MODEL_PACKAGE_ROOT", "/tmp/model-publication"),
+        quality_gate_passed=gate_passed,
+    )
+    model_uri, published_model_version, _archive_sha256 = upload_model_step(
+        archive_path,
+        model_version=packaged_model_version,
+        archive_sha256=archive_sha256,
+        bucket=os.getenv("MODEL_BUCKET", os.getenv("S3_BUCKET", "ml-models")),
+        model_name=model_name,
+        endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+        access_key=os.getenv("S3_ACCESS_KEY"),
+        secret_key=os.getenv("S3_SECRET_KEY"),
+        region=os.getenv("S3_REGION", "us-east-1"),
+    )
+    return model_uri, published_model_version, gate_metrics
 
 
 def main() -> None:
@@ -139,6 +164,8 @@ def main() -> None:
         enable_ensemble=os.getenv("AUTOGLUON_ENABLE_ENSEMBLE", "true").lower()
         not in {"0", "false", "no"},
         model_profile=os.getenv("AUTOGLUON_MODEL_PROFILE", "local_safe"),
+        model_name=os.getenv("MODEL_NAME", "store-sales"),
+        model_version=os.getenv("MODEL_VERSION") or None,
     )
 
 

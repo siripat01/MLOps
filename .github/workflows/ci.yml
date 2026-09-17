@@ -17,3 +17,6 @@ jobs:
       - run: uv sync --locked --extra dev
       - run: uv run ruff check .
       - run: uv run pytest --cov=mlops_project
+      - name: Test serving project
+        working-directory: serving
+        run: uv sync --locked --extra dev && uv run pytest tests -q
