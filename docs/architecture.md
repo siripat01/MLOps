@@ -33,3 +33,17 @@ request -> Pydantic validation -> AutoGluonModel.predict -> JSON response
 ## Compatibility
 
 Training and serving pin AutoGluon Timeseries 1.6.1. The serving image is generic across model versions but must use a compatible AutoGluon version recorded in each manifest.
+
+## Observability
+
+The serving API exposes Prometheus metrics at `/metrics`. The local Docker
+stack runs Prometheus and Grafana with a provisioned dashboard and alert rules
+for 5xx rate, p95 latency, readiness, and release-baseline drift. An optional
+`MONITORING_ALERT_WEBHOOK` receives compact alert payloads without raw request
+data.
+
+Training packages numeric summary statistics under `monitoring_baseline` in
+the model manifest. Serving compares aggregate request observations to that
+model-version-specific baseline. Delayed realized values can be submitted to
+`POST /feedback` using the prediction request ID; the API computes MAE/RMSE and
+stores only the feedback summary in its append-only JSONL sink.

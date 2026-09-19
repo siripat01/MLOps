@@ -9,6 +9,7 @@ dependencies = [
   "fastapi>=0.115,<1",
   "numpy>=1.26,<3",
   "pandas>=2.0,<2.4",
+  "prometheus-client>=0.20,<1",
   "pydantic>=2,<3",
   "torch>=2.8,<2.11",
   "uvicorn[standard]>=0.30,<1",

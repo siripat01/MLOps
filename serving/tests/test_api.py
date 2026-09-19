@@ -1,10 +1,14 @@
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
+from prometheus_client import CollectorRegistry
 
 from app.config import Settings
 from app.main import app
 from app.model import validate_prediction_request
-from app.schemas import ModelMetadata, PredictionRequest
+from app.monitoring import MonitoringRecorder
+from app.schemas import ModelMetadata, PredictionPoint, PredictionRequest, PredictionResponse
 
 
 def payload() -> dict:
@@ -19,6 +23,15 @@ def test_health_does_not_require_model() -> None:
     response = TestClient(app).get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_metrics_endpoint_exposes_prometheus_metrics() -> None:
+    app.state.monitoring = MonitoringRecorder(registry=CollectorRegistry())
+
+    response = TestClient(app).get("/metrics")
+
+    assert response.status_code == 200
+    assert "forecast_api_model_ready" in response.text
 
 
 def test_ready_fails_before_model_load() -> None:
@@ -42,6 +55,81 @@ def test_predict_uses_loaded_model() -> None:
     response = TestClient(app).post("/predict", json=payload())
     assert response.status_code == 200
     assert response.json() == {"predictions": []}
+
+
+def test_predict_returns_request_id_and_records_prediction() -> None:
+    app.state.metadata = ModelMetadata(
+        model_name="store-sales",
+        model_version="v1",
+        artifact_uri="s3://bucket/model.tar.gz",
+        framework="autogluon-timeseries",
+        autogluon_version="1.6.1",
+        python_version="3.12.0",
+        artifact_sha256="a" * 64,
+    )
+    app.state.monitoring = MonitoringRecorder(registry=CollectorRegistry())
+
+    class FakeModel:
+        def predict(self, request):
+            return PredictionResponse(
+                predictions=[
+                    PredictionPoint(
+                        item_id="1",
+                        timestamp=datetime(2024, 1, 2),
+                        values={"mean": 10.0},
+                    )
+                ]
+            )
+
+    app.state.model = FakeModel()
+    response = TestClient(app).post("/predict", json=payload())
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"]
+    assert response.json()["predictions"][0]["values"] == {"mean": 10.0}
+
+
+def test_feedback_scores_predictions_for_known_request(tmp_path) -> None:
+    app.state.metadata = ModelMetadata(
+        model_name="store-sales",
+        model_version="v1",
+        artifact_uri="s3://bucket/model.tar.gz",
+        framework="autogluon-timeseries",
+        autogluon_version="1.6.1",
+        python_version="3.12.0",
+        artifact_sha256="a" * 64,
+    )
+    app.state.monitoring = MonitoringRecorder(registry=CollectorRegistry())
+
+    class FakeModel:
+        def predict(self, request):
+            return PredictionResponse(
+                predictions=[
+                    PredictionPoint(
+                        item_id="1",
+                        timestamp=datetime(2024, 1, 2),
+                        values={"mean": 10.0},
+                    )
+                ]
+            )
+
+    app.state.model = FakeModel()
+    app.state.feedback_store_path = tmp_path / "feedback.jsonl"
+    client = TestClient(app)
+    prediction = client.post("/predict", json=payload())
+
+    response = client.post(
+        "/feedback",
+        json={
+            "request_id": prediction.headers["x-request-id"],
+            "model_version": "v1",
+            "actuals": [{"item_id": "1", "timestamp": "2024-01-02", "sales": 12}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["metrics"]["mae"] == 2.0
+    assert app.state.feedback_store_path.read_text().count("request_id") == 1
 
 
 def test_predict_maps_model_input_errors_to_422() -> None:

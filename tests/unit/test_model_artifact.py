@@ -51,6 +51,21 @@ def test_package_model_contains_complete_predictor_and_manifest(tmp_path: Path) 
     assert len(packaged.archive_sha256) == 64
 
 
+def test_package_model_includes_monitoring_baseline_in_manifest(tmp_path: Path) -> None:
+    packaged = package_model(
+        predictor_dir(tmp_path),
+        model_name="store-sales",
+        model_version="v20",
+        artifact_root=tmp_path / "artifacts",
+        monitoring_baseline={"sales": {"mean": 10.0, "std": 2.0}},
+    )
+
+    with tarfile.open(packaged.archive_path, "r:gz") as archive:
+        manifest = json.loads(archive.extractfile("manifest.json").read())
+
+    assert manifest["monitoring_baseline"] == {"sales": {"mean": 10.0, "std": 2.0}}
+
+
 def test_model_uri_is_versioned() -> None:
     assert build_model_uri("ml-models", "store-sales", "v19") == (
         "s3://ml-models/store-sales/v19/model.tar.gz"

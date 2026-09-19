@@ -117,6 +117,36 @@ the final date in `history`.
 
 For local Compose, set `MODEL_URI` and run `make serve-api`. The same image can run with any compatible model version; model files are never copied into the image.
 
+## Monitoring
+
+The local Compose stack includes Prometheus and Grafana. Prometheus scrapes the
+serving API at `/metrics`, and Grafana is available at
+`http://localhost:3000` with the provisioned **Forecast API Monitoring**
+dashboard. Prometheus is available at `http://localhost:9090`.
+
+The serving API records request rate, status, latency, model readiness, model
+version traffic, prediction counts, and release-baseline drift for sales,
+promotion, and holiday inputs. Monitoring data does not retain raw prediction
+histories. Set `MONITORING_ALERT_WEBHOOK` to receive compact JSON alerts for
+5xx responses, slow requests, and drift breaches.
+
+When realized sales become available, submit delayed feedback using the
+request ID returned in `X-Request-ID`:
+
+```json
+{
+  "request_id": "<request-id>",
+  "model_version": "v19",
+  "actuals": [
+    {"item_id": "1_AUTOMOTIVE", "timestamp": "2017-01-08T00:00:00", "sales": 12}
+  ]
+}
+```
+
+The response reports matched-point count, MAE, and RMSE. Feedback summaries
+are appended to `MONITORING_FEEDBACK_PATH`, which is backed by the
+`monitoring_data` Compose volume by default.
+
 ## Promotion and rollback
 
 Promotion validates that the artifact exists and writes a pointer such as:

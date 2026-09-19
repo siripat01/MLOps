@@ -11,6 +11,7 @@ from zenml.orchestrators.local_docker.local_docker_orchestrator import (
 
 from pipelines.training.steps.eval import evaluate_model
 from pipelines.training.steps.load_feature import load_dataset
+from pipelines.training.steps.monitoring import build_monitoring_baseline_step
 from pipelines.training.steps.package_model import package_model_step
 from pipelines.training.steps.prepare_split import prepare_training_data
 from pipelines.training.steps.quality_gate import quality_gate
@@ -140,6 +141,7 @@ def training_pipeline(
         max_wql=max_wql,
         max_rmse=max_rmse,
     )
+    monitoring_baseline = build_monitoring_baseline_step(train_ts)
     archive_path, packaged_model_version, archive_sha256 = package_model_step(
         model_path,
         model_name=model_name,
@@ -147,6 +149,7 @@ def training_pipeline(
         artifact_root=os.getenv("MODEL_PACKAGE_ROOT", "/tmp/model-publication"),
         quality_gate_passed=gate_passed,
         prediction_length=prediction_length,
+        monitoring_baseline=monitoring_baseline,
     )
     model_uri, published_model_version, _archive_sha256 = upload_model_step(
         archive_path,

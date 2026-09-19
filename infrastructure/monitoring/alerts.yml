@@ -1,0 +1,35 @@
+groups:
+  - name: forecast-api
+    rules:
+      - alert: ForecastApiHighErrorRate
+        expr: >-
+          sum(rate(forecast_api_requests_total{status="5xx"}[5m]))
+          / clamp_min(sum(rate(forecast_api_requests_total[5m])), 1) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Forecast API 5xx rate is above 5%
+      - alert: ForecastApiHighLatency
+        expr: >-
+          histogram_quantile(0.95,
+            sum by (le) (rate(forecast_api_request_duration_seconds_bucket{route="/predict"}[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Forecast API p95 prediction latency is above 2 seconds
+      - alert: ForecastApiNotReady
+        expr: forecast_api_model_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Forecast API model is not ready
+      - alert: ForecastApiFeatureDrift
+        expr: forecast_api_drift_score >= 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Forecast API feature drift exceeds the configured baseline threshold
