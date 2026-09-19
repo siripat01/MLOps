@@ -85,8 +85,8 @@ def test_webhook_alerter_sends_alert_without_raw_payload() -> None:
     ]
 
 
-def test_default_monitoring_recorder_renders_default_registry() -> None:
-    payload, content_type = MonitoringRecorder().render()
+def test_monitoring_recorder_renders_isolated_registry() -> None:
+    payload, content_type = MonitoringRecorder(registry=CollectorRegistry()).render()
 
     assert b"forecast_api_model_ready" in payload
     assert content_type.startswith("text/plain")
